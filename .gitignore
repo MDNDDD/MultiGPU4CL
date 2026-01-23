@@ -2,6 +2,7 @@
 *.csv
 
 build/
+
 run_10w.sh
 run_100w.sh
 switch-cuda.sh
