@@ -2,8 +2,6 @@
 #include<vector>
 #include<iostream>
 
-
-
 /*
 print_a_sequence_of_elements_v1 suits
 vector<int>, vector<double>, vector<string>, or lists, or unordered_sets
@@ -17,12 +15,6 @@ static void print_a_sequence_of_elements(T& input_sequence) {
 	}
 
 }
-
-
-
-
-
-
 
 // vector
 
@@ -49,12 +41,6 @@ static void print_vector_pair_int(std::vector<std::pair<int, int>>& input_vector
 
 }
 
-
-
-
-
-
-
 // list 
 #include <list>
 static void print_list_int(std::list<int>& input_list) {
@@ -65,16 +51,6 @@ static void print_list_int(std::list<int>& input_list) {
 	}
 	std::cout << "print_list_int END" << std::endl;
 }
-
-
-
-
-
-
-
-
-
-
 
 // unordered_set
 
@@ -93,11 +69,6 @@ static void print_unordered_set_v1(std::unordered_set<T>& input_set) {
 	}
 
 }
-
-
-
-
-
 
 // unordered_map
 
@@ -142,7 +113,6 @@ static void print_unordered_map_int_int(std::unordered_map<int, int>& input_map)
 	}
 	std::cout << "print_unordered_map_int_int END" << std::endl;
 }
-
 
 static void print_unordered_map_int_double(std::unordered_map<int, double>& input_map) {
 

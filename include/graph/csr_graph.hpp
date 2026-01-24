@@ -5,11 +5,10 @@
 #include "cuda_runtime.h"
 #include <cuda_runtime_api.h>
 #include <vector>
-// #include <graph_structure/graph_structure.hpp>
 #include <graph/ldbc.hpp>
 #include <graph_v_of_v/graph_v_of_v.h>
 
-/*for GPU*/
+/* for GPU */
 template <typename weight_type>
 class CSR_graph {
 public:
@@ -18,7 +17,7 @@ public:
         Now, Neighbor_sizes[i] = Neighbor_start_pointers[i + 1] - Neighbor_start_pointers[i].
         And Neighbor_start_pointers[V] = Edges.size() = Edge_weights.size() = the total number of edges.
     */
-    std::vector<int> INs_Edges, OUTs_Edges, all_Edges;                       // Edges[Neighbor_start_pointers[i]] is the start of Neighbor_sizes[i] neighbor IDs
+    std::vector<int> INs_Edges, OUTs_Edges, all_Edges; // Edges[Neighbor_start_pointers[i]] is the start of Neighbor_sizes[i] neighbor IDs
     std::vector<int> ARRAY_source, ARRAY_inv;
     std::vector<int> pointer;
 
@@ -37,7 +36,6 @@ public:
 };
 
 template <typename weight_type>
-// CSR_graph<weight_type> toCSR(graph_structure<weight_type>& graph)
 CSR_graph<weight_type> toCSR(LDBC<weight_type> &graph, std::map<std::pair<int, int>, int > *edge_id = nullptr) {
     CSR_graph<weight_type> ARRAY;
 
@@ -71,14 +69,12 @@ CSR_graph<weight_type> toCSR(LDBC<weight_type> &graph, std::map<std::pair<int, i
         pointer += graph.OUTs[i].size();
     }
     ARRAY.OUTs_Neighbor_start_pointers[V] = pointer;
-    printf("pointer: %d\n", pointer);
     
     int id = 0;
     for (int i = 0; i < V; i++) {
         for (auto &xx : graph.OUTs[i]) {  
             if (i != ARRAY.OUTs_Edges[ARRAY.pointer[xx.first]]) {
-                printf("inv wrong !!!\n");
-                printf("u1, v1, u2, v2: %d, %d, %d, %d\n", i, xx.first, xx.first, ARRAY.OUTs_Edges[ARRAY.pointer[xx.first]]);
+                printf("inv wrong !!!\nu1, v1, u2, v2: %d, %d, %d, %d\n", i, xx.first, xx.first, ARRAY.OUTs_Edges[ARRAY.pointer[xx.first]]);
                 exit(0);
             }
             (*edge_id)[std::make_pair(i, xx.first)] = id ++;
@@ -103,22 +99,13 @@ CSR_graph<weight_type> toCSR(LDBC<weight_type> &graph, std::map<std::pair<int, i
     int E_out = ARRAY.OUTs_Edges.size();
     int E_all = E_in + E_out;
     ARRAY.E_all = E_all;
-    // cudaMallocManaged(&ARRAY.in_pointer, (V + 1) * sizeof(int));
+    
     cudaMallocManaged(&ARRAY.out_pointer, (V + 1) * sizeof(int));
-    // cudaMallocManaged(&ARRAY.all_pointer, (V + 1) * sizeof(int));
-    // cudaMallocManaged(&ARRAY.in_edge, E_in * sizeof(int));
     cudaMallocManaged(&ARRAY.out_edge, E_out * sizeof(int));
-    // cudaMallocManaged(&ARRAY.all_edge, E_all * sizeof(int));
-    // cudaMallocManaged(&ARRAY.in_edge_weight, E_in * sizeof(int));
     cudaMallocManaged(&ARRAY.out_edge_weight, E_out * sizeof(int));
     
-    // cudaMemcpy(ARRAY.in_pointer, ARRAY.INs_Neighbor_start_pointers.data(), (V + 1) * sizeof(int), cudaMemcpyHostToDevice);
     cudaMemcpy(ARRAY.out_pointer, ARRAY.OUTs_Neighbor_start_pointers.data(), (V + 1) * sizeof(int), cudaMemcpyHostToDevice);
-    // cudaMemcpy(ARRAY.all_pointer, ARRAY.ALL_start_pointers.data(), (V + 1) * sizeof(int), cudaMemcpyHostToDevice);
-    // cudaMemcpy(ARRAY.in_edge, ARRAY.INs_Edges.data(), E_in * sizeof(int), cudaMemcpyHostToDevice);
     cudaMemcpy(ARRAY.out_edge, ARRAY.OUTs_Edges.data(), E_out * sizeof(int), cudaMemcpyHostToDevice);
-    // cudaMemcpy(ARRAY.all_edge, ARRAY.all_Edges.data(), E_all * sizeof(int), cudaMemcpyHostToDevice);
-    // cudaMemcpy(ARRAY.in_edge_weight, ARRAY.INs_Edge_weights.data(), E_in * sizeof(int), cudaMemcpyHostToDevice);
     cudaMemcpy(ARRAY.out_edge_weight, ARRAY.OUTs_Edge_weights.data(), E_out * sizeof(int), cudaMemcpyHostToDevice);
     
     cudaMallocManaged(&ARRAY.source, E_out * sizeof(int));
@@ -153,7 +140,6 @@ CSR_graph<weight_type> graph_v_of_v_to_CSR(graph_v_of_v<weight_type> &g) {
     ARRAY.OUTs_Edges =  ARRAY.INs_Edges;
     ARRAY.OUTs_Edge_weights = ARRAY.INs_Edge_weights;
     ARRAY.OUTs_Neighbor_start_pointers = ARRAY.INs_Neighbor_start_pointers;
-
 
     // pointer = 0;
     // for (int i = 0; i < V; i++) {

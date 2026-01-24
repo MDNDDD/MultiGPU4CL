@@ -1405,19 +1405,7 @@ void set_info (int &algo, int &hop_cst, int &thread_num, int &CPU_Gen_Num, int &
     }
 }
 
-// GPU预热核函数
-__global__ void gpu_warmup_kernel(float* dummy, int iterations) {
-    int idx = threadIdx.x + blockIdx.x * blockDim.x;
-    // 简单的计算任务（避免编译器优化）
-    float sum = 0.0f;
-    for (int i = 0; i < iterations; ++i) {
-        sum += sqrtf(float(idx) + 0.1f) * cosf(float(i) * 0.5f);
-    }
-    // 写入全局内存（避免被优化掉）
-    if (dummy) {
-        dummy[idx] = sum;
-    }
-}
+
 
 inline graph_v_of_v<int> example_graph () {
     graph_v_of_v<int> init_graph(8);
@@ -1448,34 +1436,34 @@ inline graph_v_of_v<int> example_graph () {
     return init_graph;
 }
 
-// 主机端调用示例
-inline void gpu_warmup() {
-    const int num_threads = 256;
-    const int num_blocks = 256;  // 根据GPU调整（总线程数 = 256*1024=262,144）
-    const int iterations = 100;   // 控制计算强度
-    float* d_dummy;
-    
-    cudaMalloc(&d_dummy, num_threads * num_blocks * sizeof(float));
-    // 启动预热核函数
-    gpu_warmup_kernel<<<num_blocks, num_threads>>>(d_dummy, iterations);
-    // 同步等待完成
-    cudaDeviceSynchronize();
-    // 清理内存
-    cudaFree(d_dummy);
+// GPU warm-up kernel function
+__global__ void gpu_warmup_kernel(float* dummy, int iterations) {
+    int idx = threadIdx.x + blockIdx.x * blockDim.x;
+    float sum = 0.0f;
+    for (int i = 0; i < iterations; ++i) {
+        sum += sqrtf(float(idx) + 0.1f) * cosf(float(i) * 0.5f);
+    }
+    // write to global memory (to avoid being optimized out)
+    if (dummy) {
+        dummy[idx] = sum;
+    }
 }
 
-// inline __host__ __device__ int get_to_vertex (long long x) {
-//     return (x >> 37);
-// }
-// inline __host__ __device__ int get_hub_vertex (long long x) {
-//     return (x >> 13) & ((1 << 24) - 1);
-// }
-// inline __host__ __device__ int get_hop (long long x) {
-//     return (x >> 10) & ((1 << 3) - 1);
-// }
-// inline __host__ __device__ int get_distance (long long x) {
-//     return (x) & ((1 << 10) - 1);
-// }
+// GPU warm-up
+inline void gpu_warmup() {
+    const int num_threads = 256, num_blocks = 256, iterations = 100;
+    float* d_dummy;
+    cudaMalloc(&d_dummy, num_threads * num_blocks * sizeof(float));
+    
+    // start the preheating kernel function
+    gpu_warmup_kernel<<<num_blocks, num_threads>>>(d_dummy, iterations);
+
+    // wait for synchronization to complete
+    cudaDeviceSynchronize();
+    
+    // free up memory
+    cudaFree(d_dummy);
+}
 
 double sort_time_record = 0;
 
@@ -1513,8 +1501,8 @@ int main (int argc, char** argv) {
     // data_path = "/home/mdnd/dataset/data_exp_amazon-meta/amazon-meta/amazon-meta.e";
     // data_path = "/home/mdnd/dataset/data_exp_amazon-meta2/amazon-meta2/amazon-meta2.e";
     // data_path = "/home/mdnd/dataset/data_exp_web-BerkStan/web-BerkStan/web-BerkStan.e";
-    // data_path = "/home/mdnd/dataset/data_exp_web-Google/web-Google/web-Google.e";
-    data_path = "/home/mdnd/dataset/data_exp_DBLP/DBLP/DBLP.e";
+    data_path = "/home/mdnd/dataset/data_exp_web-Google/web-Google/web-Google.e";
+    // data_path = "/home/mdnd/dataset/data_exp_DBLP/DBLP/DBLP.e";
     // data_path = "/home/mdnd/dataset/data_exp_com-youtube/com-youtube/com-youtube.e";
     // data_path = "/home/mdnd/dataset/data_exp_wiki-talk/wiki-talk/wiki-talk.e";
     // data_path = "/home/mdnd/dataset/data_exp_as-skitter/as-skitter/as-skitter.e";

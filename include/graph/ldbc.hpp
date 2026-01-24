@@ -16,6 +16,7 @@
 #include "../include/text_mining/sorted_vector_binary_operations.h"
 #include "../include/text_mining/binary_save_read_vector_of_vectors.h"
 #include "../include/graph_v_of_v/graph_v_of_v.h"
+
 /* 
 	LDBC test process
 	At the beginning: give LDBC file path, data name, so that batch read different LDBC data
@@ -84,7 +85,6 @@ public:
 	std::string vertex_file, edge_file;
 
 };
-
 
 template <typename weight_type>
 int LDBC<weight_type>::add_vertice(std::string line_content) {
@@ -354,19 +354,5 @@ void LDBC<weight_type>::graph_v_of_v_to_LDBC(graph_v_of_v<int> &input_graph) {
         }
     }
 }
-// void storeResult(std::map<long long int, int> & strId2value, std::string & path){
-//     std::ofstream outFile(path);
-
-//     if (outFile.is_open()) {
-//         for (const auto& pair : strId2value) {
-//             outFile << pair.first << " " << pair.second << std::endl;
-//         }
-//         outFile.close();
-//         std::cout << "File write complete!" << std::endl;
-//     } else {
-//         std::cerr << "Unable to open file!" << std::endl;
-//     }
-
-// }
 
 #endif

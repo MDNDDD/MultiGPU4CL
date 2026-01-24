@@ -43,7 +43,6 @@ static graph_v_of_v<weight_type> graph_v_of_v_update_vertexIDs_by_degrees_large_
 	return output_graph;
 }
 
-
 template <typename weight_type>
 static graph_v_of_v<weight_type> graph_v_of_v_update_vertexIDs_by_degrees_large_to_small_mock(graph_v_of_v<weight_type>& input_graph, vector<int>& is_mock) {
 
@@ -57,8 +56,7 @@ static graph_v_of_v<weight_type> graph_v_of_v_update_vertexIDs_by_degrees_large_
 	}
 	sort(sorted_vertices.begin(), sorted_vertices.end(), compare_graph_v_of_v_update_vertexIDs_by_degrees_large_to_small);
 
-
-	/*ineffective to reduce index time and size and increase query efficiency*/
+	/* ineffective to reduce index time and size and increase query efficiency */
 	//int last_mock_ID = N;
 	//for (int i = N - 1; i >= 0; i--) {
 	//	if (is_mock[sorted_vertices[i].first]) {
@@ -101,7 +99,6 @@ static graph_v_of_v<weight_type> graph_v_of_v_update_vertexIDs_by_degrees_large_
 	//		sorted_vertices[change_begin + mocks.size() + i] = nonmocks[i];
 	//	}
 	//}
-
 
 	vector<int> vertexID_old_to_new(N);
 	for (int i = 0; i < N; i++) {

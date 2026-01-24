@@ -1,6 +1,7 @@
 #ifndef GRAPH_V_OF_V_H
 #define GRAPH_V_OF_V_H
 #pragma once
+
 /*the following codes are for testing
 
 ---------------------------------------------------
@@ -251,23 +252,20 @@ void graph_v_of_v<weight_type>::txt_read(std::string save_name) {
 	std::ifstream myfile(save_name); // open the file
 	if (myfile.is_open()) {           // if the file is opened successfully
 		getline(myfile, line_content);
-		// 解析表头，获取顶点数，ADJs.resize(n)
 		{
 			size_t pos = line_content.find("|V| =");
 			if (pos != std::string::npos) {
-				pos += 5; // 移动到 "|V| =" 后面的数字位置
+				pos += 5;
 				std::istringstream iss(line_content.substr(pos));
 				int V;
 				if (iss >> V) {
 					ADJs.resize(V);
 				} else {
 					std::cerr << "|V| " << std::endl;
-					// 处理错误，例如退出或设置默认值
 					exit(1);
 				}
 			} else {
 				std::cerr << "'|V| ='" << std::endl;
-				// 处理错误，例如退出或设置默认值
 				exit(1);
 			}
 		}
@@ -275,14 +273,12 @@ void graph_v_of_v<weight_type>::txt_read(std::string save_name) {
 		while (getline(myfile, line_content)) // read file line by line
 		{
 			std::vector<std::string> Parsed_content = parse_string(line_content, " ");
-			// printf("parse string success\n");
 			if (Parsed_content.size() == 3) // Ensure the line has exactly three elements
 			{
 				int v1 = std::stoi(Parsed_content[0]);
 				int v2 = std::stoi(Parsed_content[1]);
 				weight_type ec = static_cast<weight_type>(std::stod(Parsed_content[2]));
 				graph_v_of_v<weight_type>::add_edge(v1, v2, ec);
-				// printf("edge: %d %d %d\n", v1, v2, ec);
 			}
 		}
 

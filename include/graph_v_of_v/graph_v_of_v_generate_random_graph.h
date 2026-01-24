@@ -4,6 +4,7 @@
 
 #include <graph_v_of_v/graph_v_of_v_generate_random_graph.h>
 #include <boost/random.hpp>
+
 /*this function generates a random graph with vertex and edge weights, and this graph
 may not be connected.*/
 
