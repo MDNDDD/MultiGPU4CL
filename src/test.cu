@@ -980,9 +980,10 @@ Graph_pool<int> graph_pool;
 boost::random::mt19937 boost_random_time_seed { static_cast<std::uint32_t>(std::time(0)) }; // Random seed 
 
 struct Executive_Core {
-    int id;
-    double time_use;
-    int core_type; // 0: cpu, 1: gpu
+    int id = 0;
+    double time_use = 0.0;
+    int core_type = 0; // 0: cpu, 1: gpu
+    Executive_Core() = default;
     Executive_Core (int x, double y, int z) : id(x), time_use(y), core_type(z) {}
 };
 inline bool operator < (Executive_Core a, Executive_Core b) {
@@ -1148,7 +1149,6 @@ void GPU_HSDL_checker_query_file (vector<vector<hub_type_v2> >&LL, graph_v_of_v<
                         int iteration_source_times, int iteration_terminal_times, int hop_bounded, int check_path) {
 
     printf("Checker Start.\n");
-
     
     for (int yy = 0; yy < 10000; yy ++) {
         std::vector<weight_type> distances; // record shortest path
@@ -1336,18 +1336,17 @@ void read_graph (int &generate_new_graph, int &V, int &E, string &data_path) {
     printf("Generation Graph Successful!\n");
 }
 
-void sub_graph (int &use_cd, int &V, int &E, int &G_max, int &Distributed_Graph_Num, double &time_cd_total) {
+inline void sub_graph (int &use_cd, int &V, int &E, int &G_max, int &Distributed_Graph_Num, double &time_cd_total) {
     if (use_cd == 0) {
         graph_pool.graph_group.resize(Distributed_Graph_Num);
         int Nodes_Per_Graph = (V - 1) / Distributed_Graph_Num + 1;
         for (int i = 0; i < Distributed_Graph_Num; ++ i) {
-            for (int j = Nodes_Per_Graph * i; j < Nodes_Per_Graph * (i + 1); ++j) {
+            for (int j = Nodes_Per_Graph * i; j < Nodes_Per_Graph * (i + 1); ++ j) {
                 if (j >= V) break;
                 graph_pool.graph_group[i].push_back(j);
             }
         }
         G_max = V / Distributed_Graph_Num + 1;
-        // G_max = V;
     } else if (use_cd == 1) {
         auto begin = std::chrono::high_resolution_clock::now();
         generate_Group_CDLP(instance_graph, graph_pool.graph_group, G_max);
@@ -1356,18 +1355,7 @@ void sub_graph (int &use_cd, int &V, int &E, int &G_max, int &Distributed_Graph_
         Distributed_Graph_Num = graph_pool.graph_group.size();
     } else {
         Distributed_Graph_Num = 3;
-        
-        graph_pool.graph_group.resize(3);
-        graph_pool.graph_group[0].push_back(0);
-        graph_pool.graph_group[0].push_back(3);
-        graph_pool.graph_group[0].push_back(7);
-        
-        graph_pool.graph_group[1].push_back(1);
-        graph_pool.graph_group[1].push_back(2);
-        graph_pool.graph_group[1].push_back(4);
-
-        graph_pool.graph_group[2].push_back(5);
-        graph_pool.graph_group[2].push_back(6);
+        graph_pool.graph_group = { {0, 3, 7}, {1, 2, 4}, {5, 6} };
     }
     printf("G_max: %d\n", G_max);
 }
@@ -1405,34 +1393,13 @@ void set_info (int &algo, int &hop_cst, int &thread_num, int &CPU_Gen_Num, int &
     }
 }
 
-
-
 inline graph_v_of_v<int> example_graph () {
     graph_v_of_v<int> init_graph(8);
-    // init_graph.add_edge(0, 1, 5);
-    // init_graph.add_edge(0, 3, 1);
-    // init_graph.add_edge(0, 4, 7);
-    // init_graph.add_edge(0, 5, 3);
-    // init_graph.add_edge(1, 2, 15);
-    // init_graph.add_edge(1, 4, 2);
-    // init_graph.add_edge(2, 3, 3);
-    // init_graph.add_edge(4, 5, 3);
-
-    init_graph.add_edge(0, 1, 5);
-    init_graph.add_edge(0, 2, 3);
-    init_graph.add_edge(0, 3, 12);
-    init_graph.add_edge(0, 6, 15);
-    init_graph.add_edge(0, 7, 4);
-    
-    init_graph.add_edge(1, 2, 10);
-    init_graph.add_edge(1, 3, 2);
-    init_graph.add_edge(1, 4, 6);
-    
-    init_graph.add_edge(2, 4, 3);
-    init_graph.add_edge(2, 5, 4);
-    
+    init_graph.add_edge(0, 1, 5), init_graph.add_edge(0, 2, 3), init_graph.add_edge(0, 3, 12);
+    init_graph.add_edge(0, 6, 15), init_graph.add_edge(0, 7, 4);
+    init_graph.add_edge(1, 2, 10), init_graph.add_edge(1, 3, 2), init_graph.add_edge(1, 4, 6);
+    init_graph.add_edge(2, 4, 3), init_graph.add_edge(2, 5, 4);
     init_graph.add_edge(5, 6, 1);
-    
     return init_graph;
 }
 
@@ -1440,48 +1407,30 @@ inline graph_v_of_v<int> example_graph () {
 __global__ void gpu_warmup_kernel(float* dummy, int iterations) {
     int idx = threadIdx.x + blockIdx.x * blockDim.x;
     float sum = 0.0f;
-    for (int i = 0; i < iterations; ++i) {
-        sum += sqrtf(float(idx) + 0.1f) * cosf(float(i) * 0.5f);
-    }
-    // write to global memory (to avoid being optimized out)
-    if (dummy) {
-        dummy[idx] = sum;
-    }
+    for (int i = 0; i < iterations; ++i) sum += sqrtf(float(idx) + 0.1f) * cosf(float(i) * 0.5f);
+    if (dummy) dummy[idx] = sum;
 }
-
 // GPU warm-up
 inline void gpu_warmup() {
     const int num_threads = 256, num_blocks = 256, iterations = 100;
     float* d_dummy;
     cudaMalloc(&d_dummy, num_threads * num_blocks * sizeof(float));
-    
-    // start the preheating kernel function
     gpu_warmup_kernel<<<num_blocks, num_threads>>>(d_dummy, iterations);
-
-    // wait for synchronization to complete
     cudaDeviceSynchronize();
-    
-    // free up memory
     cudaFree(d_dummy);
 }
 
-double sort_time_record = 0;
-
 int main (int argc, char** argv) {
-    printf("test.cu !\n");
 
     srand(time(0));
-    int V = 5000, E = 30000;
-    int thread_num = 50;
-    int G_max = 500;
-    int hop_cst = 5;
-    int Distributed_Graph_Num = 1;
-    int check_correctness = 1;
-    int check_path = 1;
-    int use_cd = 1;
-    int cpu_type = 0;
-    string data_path;
-    string out_put_path;
+    int iteration_source_times = 2000, iteration_terminal_times = 2000;
+    int V = 5000, E = 30000, hop_cst = 5, G_max = 300, Distributed_Graph_Num = 1, thread_num = 50;
+    int check_correctness = 1, check_path = 1, use_cd = 1, cpu_type = 0;
+    int CPU_Gen_Num = 0, GPU_Gen_Num = 4, CPU_Clean_Num = 0, GPU_Clean_Num = 4;
+    string data_path, out_put_path;
+
+    double time_cd_total = 0.0, sort_time_record = 0.0;
+
     // data_path = "../data/simple_iterative_tests.txt";
     // data_path = "/home/mdnd/dataset/data_exp_1w/as-caida20071105/as-caida20071105.e";
     // data_path = "/home/mdnd/dataset/data_exp_1w/Brightkite_edges/Brightkite_edges.e";
@@ -1501,10 +1450,10 @@ int main (int argc, char** argv) {
     // data_path = "/home/mdnd/dataset/data_exp_amazon-meta/amazon-meta/amazon-meta.e";
     // data_path = "/home/mdnd/dataset/data_exp_amazon-meta2/amazon-meta2/amazon-meta2.e";
     // data_path = "/home/mdnd/dataset/data_exp_web-BerkStan/web-BerkStan/web-BerkStan.e";
-    data_path = "/home/mdnd/dataset/data_exp_web-Google/web-Google/web-Google.e";
+    // data_path = "/home/mdnd/dataset/data_exp_web-Google/web-Google/web-Google.e";
     // data_path = "/home/mdnd/dataset/data_exp_DBLP/DBLP/DBLP.e";
     // data_path = "/home/mdnd/dataset/data_exp_com-youtube/com-youtube/com-youtube.e";
-    // data_path = "/home/mdnd/dataset/data_exp_wiki-talk/wiki-talk/wiki-talk.e";
+    data_path = "/home/mdnd/dataset/data_exp_wiki-talk/wiki-talk/wiki-talk.e";
     // data_path = "/home/mdnd/dataset/data_exp_as-skitter/as-skitter/as-skitter.e";
     // data_path = "/home/mdnd/dataset/data_exp_reddit/reddit/reddit.e";
     // data_path = argv[1];
@@ -1515,148 +1464,92 @@ int main (int argc, char** argv) {
     
     printf("test.cu !\n");
 
-    string query_path = data_path;
-    size_t pos = query_path.rfind(".e");
-    query_path.replace(pos, 2, "_queries.txt");
-    read_query(query_path);
+    read_query(data_path.substr(0, data_path.rfind(".e")) + "_queries.txt");
+
 
     // instance_graph = graph_v_of_v_generate_random_graph<int> (V, E, 1, 100, 1, boost_random_time_seed);
-    instance_graph.txt_read(data_path);
-    // instance_graph = example_graph();
-    instance_graph = graph_v_of_v_update_vertexIDs_by_degrees_large_to_small(instance_graph);
-    V = E = 0;
-    V = instance_graph.size();
-    for (int i = 0; i < V; ++ i) {
-        E += instance_graph[i].size();
-    }
-    
     // instance_graph.txt_save("../data/simple_iterative_tests.txt");
-    // instance_graph = graph_v_of_v_update_vertexIDs_by_degrees_large_to_small(instance_graph);
-    G_max = 300;
-    double time_cd_total = 0.0;
-    use_cd = 1;
+    // instance_graph = example_graph();
+    instance_graph.txt_read(data_path);
+    V = instance_graph.vertex_num(), E = instance_graph.edge_num();
+    instance_graph = graph_v_of_v_update_vertexIDs_by_degrees_large_to_small(instance_graph);
     sub_graph (use_cd, V, E, G_max, Distributed_Graph_Num, time_cd_total);
-    printf("V, G_max, E: %d, %d, %d\n", V, G_max, E);
-    // graph_pool.graph_group.resize(1);
-    // graph_pool.graph_group[0].resize(V);
-    // for (int i = 0; i < V; i ++) {
-    //     graph_pool.graph_group[0][i] = i;
-    // }
+    printf("V, E, G_max, Distributed_Graph_Num: %d, %d, %d\n", V, E, G_max, Distributed_Graph_Num);
     
     LDBC<weight_type> graph(V);
     graph_v_of_v_to_LDBC(graph, instance_graph);
-    // graph.print();
     csr_graph = toCSR(graph, &edge_id);
+
     info_gpu = new hop_constrained_case_info_v2();
     info_gpu->hop_cst = hop_cst;
     info_gpu->set_nid(Distributed_Graph_Num, graph_pool.graph_group);
     info_gpu->init(V, hop_cst, G_max, thread_num, graph_pool.graph_group);
-    
-    if (1) {
-        info_cpu.upper_k = hop_cst;
-        info_cpu.use_rank_prune = 1;
-        if (cpu_type) {
-            info_cpu.use_2023WWW_generation = 1;
-            info_cpu.use_2023WWW_generation_optimized = 0;
-        } else {
-            info_cpu.use_2023WWW_generation = 0;
-            info_cpu.use_2023WWW_generation_optimized = 1;
-        }
-        info_cpu.use_GPU_version_generation = 0;
-        info_cpu.use_GPU_version_generation_optimized = 0;
-        info_cpu.use_canonical_repair = 0;
-        info_cpu.max_run_time_seconds = 10000;
-        info_cpu.thread_num = 50;
-        hop_constrained_two_hop_labels_generation_init(instance_graph, info_cpu);
-    }
+
+    info_cpu.upper_k = hop_cst;
+    info_cpu.use_rank_prune = 1;
+    info_cpu.use_2023WWW_generation = cpu_type ? 1 : 0;
+    info_cpu.use_2023WWW_generation_optimized = cpu_type ? 0 : 1;
+    info_cpu.thread_num = thread_num;
+    hop_constrained_two_hop_labels_generation_init(instance_graph, info_cpu);
+
     L_hybrid.resize(V);
     
-    gpu_warmup ();
-    long long *L = (long long *)malloc(1000000000ll * sizeof(long long)), L_size = 0;
-    // auto begin = std::chrono::high_resolution_clock::now();
-    // hop_constrained_two_hop_labels_generation(instance_graph, info_cpu, L_hybrid, graph_pool.graph_group[0]);
-    double time_use = 0.0;
-    // label_gen_v3(csr_graph, info_gpu, L + L_size, L_size, L_hybrid, graph_pool.graph_group[0], 0);
     
-    priority_queue<Executive_Core> pq_gen;
+    long long *L = (long long *)malloc(1000000000ll * sizeof(long long)), delta_L = 0, tot_L = 0;
+    
+    priority_queue<Executive_Core> pq_gen; Executive_Core x;
     vector<long long> L_size_before(V, 0);
-    int CPU_Gen_Num = 0, GPU_Gen_Num = 4;
     for (int i = 0; i < CPU_Gen_Num; ++i) pq_gen.push(Executive_Core(GPU_Gen_Num + i, 0, 0)); // id, time, cpu/gpu
     for (int i = 0; i < GPU_Gen_Num; ++i) pq_gen.push(Executive_Core(i, 0, 1)); // id, time, cpu/gpu
-    
-    long long tot_L = 0;
-    printf("Distributed_Graph_Num: %d\n", Distributed_Graph_Num);
-    for (int i = 0; i < Distributed_Graph_Num; ++i) {
-        long long degree = 0;
-        for (int j = 0; j < graph_pool.graph_group[i].size(); j ++) {
-            degree += instance_graph[graph_pool.graph_group[i][j]].size();
-        }
-        printf("degree: %lld\n", degree);
-        Executive_Core x = pq_gen.top();
+    gpu_warmup ();
+    for (int i = 0; i < Distributed_Graph_Num; ++ i, delta_L = 0) {
+        x = pq_gen.top();
         pq_gen.pop();
-
-        L_size = 0;
         auto begin = std::chrono::high_resolution_clock::now();
-        if (x.core_type == 0) {
-            // core type is cpu
+        if (x.core_type == 0) { // core type is cpu
             hop_constrained_two_hop_labels_generation(instance_graph, info_cpu, L_hybrid, graph_pool.graph_group[i]);
-            // info_cpu.print_L(L_hybrid);
-        } else {
-            label_gen_v4(csr_graph, info_gpu, L + L_size, L_size, graph_pool.graph_group[i], i, sort_time_record);
+        } else { // core type is gpu
+            label_gen_v4(csr_graph, info_gpu, L + delta_L, delta_L, graph_pool.graph_group[i], i, sort_time_record);
             // label_gen_v3(csr_graph, info_gpu, L + L_size, L_size, graph_pool.graph_group[i], i, sort_time_record);
-            printf("finish label_gen_v3 !\n");
-            for (long long j = 0; j < L_size; j ++) {
+            for (long long j = 0; j < delta_L; j ++) {
                 long long T = L[j];
-                hop_constrained_two_hop_label xxx_t;
-                xxx_t.hub_vertex = get_hub_vertex(T);
-                xxx_t.hop = get_hop(T);
-                xxx_t.distance = get_distance(T);
-                xxx_t.parent_vertex = csr_graph.OUTs_Edges[get_to_vertex(T)];
-                L_hybrid[csr_graph.ARRAY_source[get_to_vertex(T)]].push_back(xxx_t);
-                // printf("to, hub, h, dis: %d, %d, %d, %d\n", csr_graph.ARRAY_source[get_to_vertex(T)], get_hub_vertex(T)
-                //                                           , get_hop(T), get_distance(T));
-                // L_hybrid[get_to_vertex(T)].push_back(xxx_t);
+                int to_v = get_to_vertex(T);
+                L_hybrid[csr_graph.ARRAY_source[to_v]].push_back({
+                    get_hub_vertex(T), csr_graph.OUTs_Edges[to_v], get_hop(T), get_distance(T)});
             }
-            tot_L += L_size;
-            printf("L_size: %lld\n", L_size);
-            printf("tot_L: %lld\n", tot_L);
+            tot_L += delta_L;
+            printf("tot_L, delta_L: %lld, %lld\n", tot_L, delta_L);
         }
         auto end = std::chrono::high_resolution_clock::now();
         auto duration = std::chrono::duration_cast<std::chrono::nanoseconds>(end - begin).count() / 1e9;
-        printf("duration time: %.6lf\n\n", (double)duration);
-        
-        long long L_size_add = 0;
-        for (int i = 0; i < V; i ++) {
-            L_size_add += L_hybrid[i].size() - L_size_before[i];
-            // if (L_hybrid[i].size() - L_size_before[i] > V) {
-            //     printf("size b a: %d %lld %lld\n", (int)L_hybrid[i].size(), L_size_before[i], L_size_add);
-            // }
-            L_size_before[i] = L_hybrid[i].size();
-        }
-        printf("L_size_add: %lld\n", L_size_add);
         x.time_use += duration;
         pq_gen.push(x);
+        printf("duration time: %.8lf\n", (double)duration);
+        
+        // long long L_size_add = 0;
+        // for (int i = 0; i < V; i ++) {
+        //     L_size_add += L_hybrid[i].size() - L_size_before[i];
+        //     L_size_before[i] = L_hybrid[i].size();
+        // }
+        // printf("L_size_add: %lld\n", L_size_add);
     }
-    // return 0;
-    // statistical time
+    printf("sort_time_record: %.8lf\n", sort_time_record);
     double time_generate_labels_total = 0.0;
     while (!pq_gen.empty()) {
-        Executive_Core x = pq_gen.top();
+        time_generate_labels_total = max(time_generate_labels_total, pq_gen.top().time_use);
+        printf("time generate labels total: %.8lf\n", time_generate_labels_total);
         pq_gen.pop();
-        time_generate_labels_total = max(time_generate_labels_total, x.time_use);
-        printf("Time_Generate_Labels_Total: %.8lf\n", time_generate_labels_total);
     }
-    printf("Finish add label!!!\n");
-    printf("sort_time_record: %.8lf\n", sort_time_record);
+    printf("finish add label.\n");
     
     long long label_before_clean = 0, label_after_clean = 0;
     for (int v_k = 0; v_k < V; v_k ++) {
         label_before_clean += L_hybrid[v_k].size();
     }
-    printf("label size begin: %lld\n", label_before_clean);
 
     // sort
     if (check_correctness) {
+        #pragma omp parallel for schedule(dynamic)
         for (int v_k = 0; v_k < V; ++ v_k) {
             sort(L_hybrid[v_k].begin(), L_hybrid[v_k].end(), compare_hop_constrained_two_hop_label);
         }
@@ -1671,24 +1564,20 @@ int main (int argc, char** argv) {
     // csr_graph.destroy_csr_graph();
     cudaMemGetInfo(&free_byte, &total_byte);
     printf("Device memory after: total %ld, free %ld\n", total_byte, free_byte);
-
     info_gpu->init_clean(V, L_hybrid, csr_graph, label_before_clean, edge_id);
     L_hybrid.resize(V);
-    priority_queue<Executive_Core> pq_clean;
 
-    int CPU_Clean_Num = 0, GPU_Clean_Num = 4;
-    long long clean_size = 2000;
-    long long last_pos = 1;
+    priority_queue<Executive_Core> pq_clean;
+    long long clean_size = 2000, last_pos = 1;
     for (int i = 0; i < CPU_Clean_Num; ++i) pq_clean.push(Executive_Core(GPU_Gen_Num + i, 0, 0)); // id, time, cpu/gpu
     for (int i = 0; i < GPU_Clean_Num; ++i) pq_clean.push(Executive_Core(i, 0, 1)); // id, time, cpu/gpu
+    gpu_warmup ();
     for (long long i = 0; i < V; i += clean_size) {
-        Executive_Core x = pq_clean.top();
+        x = pq_clean.top();
         pq_clean.pop();
-        // 0, 
         auto begin = std::chrono::high_resolution_clock::now();
         if (x.core_type == 0) {
             hop_constrained_clean_L_distributed (info_cpu, L_hybrid, i, min(i + clean_size, (long long)V), info_cpu.thread_num);
-            // info_cpu.print_L(L_hybrid);
         } else {
             gpu_clean_v4 (csr_graph, i, min(i + clean_size, (long long)V), info_gpu, last_pos);
             for (int j = i; j < min(i + clean_size, (long long)V); j ++) {
@@ -1698,11 +1587,6 @@ int main (int argc, char** argv) {
             if (info_gpu->last_size - last_pos > 0) {
                 cudaMemPrefetchAsync(info_gpu->L_clean + last_pos, info_gpu->last_size - last_pos, cudaCpuDeviceId, 0);
                 cudaDeviceSynchronize();
-            }
-            cudaError_t err = cudaGetLastError();
-            if (err != cudaSuccess) {
-                printf("Kernel launch error cudaMemPrefetchAsync: %s\n", cudaGetErrorString(err));
-                exit(0);
             }
             for (long long j = last_pos; j < info_gpu->last_size; j ++) {
                 long long T = info_gpu->L_clean[j];
@@ -1715,7 +1599,6 @@ int main (int argc, char** argv) {
                 } else {
                     xxx_t.parent_vertex = csr_graph.OUTs_Edges[get_to_vertex(T)];
                 }
-                // xxx_t.parent_vertex = csr_graph.OUTs_Edges[get_to_vertex(T)];
                 L_hybrid[csr_graph.ARRAY_source[get_to_vertex(T)]].push_back(xxx_t);
                 // printf("csr_graph.ARRAY_source[get_to_vertex(T)]: %lld\n", csr_graph.ARRAY_source[get_to_vertex(T)]);
             }
@@ -1723,84 +1606,38 @@ int main (int argc, char** argv) {
         }
         auto end = std::chrono::high_resolution_clock::now();
         auto duration = std::chrono::duration_cast<std::chrono::nanoseconds>(end - begin).count() / 1e9;
-        printf("duration time: %.6lf\n", (double)duration);
         x.time_use += duration;
-        // if (x.core_type == 1) x.time_use += 10000;
         pq_clean.push(x);
+        printf("duration time: %.8lf\n", (double)duration);
     }
-    // return 0;
     double time_clean_labels_total = 0.0;
     while (!pq_clean.empty()) {
-        Executive_Core x = pq_clean.top();
+        time_clean_labels_total = max(time_clean_labels_total, pq_clean.top().time_use);
+        printf("time clean labels total: %.8lf\n", time_clean_labels_total);
         pq_clean.pop();
-        time_clean_labels_total = max(time_clean_labels_total, x.time_use);
-        printf("Time_Clean_Labels_Total: %.8lf\n", time_clean_labels_total);
     }
-    printf("Finish clean label!!!\n");
-    // for (long long i = 0; i < V; i ++) {
-    //     if (i < 50) printf("L_start, L_end: %d, %lld, %lld\n", i, info_gpu->L_start[i], info_gpu->L_end[i]);
-    //     if (V - i < 50) printf("L_start, L_end: %d, %lld, %lld\n", i, info_gpu->L_start[i], info_gpu->L_end[i]);
-    // }
+    printf("finish clean label.\n");
 
-
-
-
-    // for (int j = 0; j < clean_size; j ++) {
-    //     L_hybrid[j].clear();
-    // }
-    // for (long long j = 1; j < last_pos; j ++) {
-    //     long long T = info_gpu->L_clean[j];
-    //     hop_constrained_two_hop_label xxx_t;
-    //     xxx_t.hub_vertex = get_hub_vertex(T);
-    //     xxx_t.hop = get_hop(T);
-    //     xxx_t.distance = get_distance(T);
-    //     if (xxx_t.hop == 0) {
-    //         xxx_t.parent_vertex = csr_graph.ARRAY_source[get_to_vertex(T)];
-    //     } else {
-    //         xxx_t.parent_vertex = csr_graph.OUTs_Edges[get_to_vertex(T)];
-    //     }
-    //     L_hybrid[csr_graph.ARRAY_source[get_to_vertex(T)]].push_back(xxx_t);
-    // }
-
-
-
-
-    label_after_clean = info_gpu->last_size - 1;
-    printf("label size before: %lld\n", label_before_clean);
-    label_after_clean = 0;
     for (int i = 0; i < V; i ++) {
         label_after_clean += L_hybrid[i].size();
     }
-    printf("label size after: %lld\n", label_after_clean);
-    
-    // auto begin = std::chrono::high_resolution_clock::now();
-    // hop_constrained_clean_L(info_cpu, L_hybrid, info_cpu.thread_num, V);
-    // auto end = std::chrono::high_resolution_clock::now();
-    // auto time_clean_labels_cpu_total = std::chrono::duration_cast<std::chrono::nanoseconds>(end - begin).count() / 1e9;
-    printf("generation time: %.8lf\n", (double)time_generate_labels_total);
-    printf("clean time: %.8lf\n", (double)time_clean_labels_total);
-    // printf("clean time cpu: %.8lf\n", (double)time_clean_labels_cpu_total);
 
-    // label_after_clean = 0;
-    // for (int v_k = 0; v_k < V; v_k ++) {
-    //     label_after_clean += L_hybrid[v_k].size();
-    // }
-    // printf("label size after: %lld\n", label_after_clean);
+    printf("label size before: %lld\n", label_before_clean);
+    printf("label size after: %lld\n", label_after_clean);
+    printf("total generation time: %.8lf\n", (double)time_generate_labels_total);
+    printf("total clean time: %.8lf\n", (double)time_clean_labels_total);
 
     if (check_correctness) {
-        printf("Check Union !\n");
-        int iteration_source_times = 2000, iteration_terminal_times = 2000;
+        printf("check union correctness.\n");
         GPU_HSDL_checker_query_file(L_hybrid, instance_graph, iteration_source_times, iteration_terminal_times, hop_cst, check_path);
     }
 
     std::ofstream out(out_put_path, std::ios::app);
     out << fixed << setprecision(8) << data_path << ", " << hop_cst << ", " 
     << time_generate_labels_total << ", " << label_before_clean << ", " 
-    << time_clean_labels_total << ", " << label_after_clean << std::endl;
-
-    out << fixed << setprecision(8) << "algo_query_time: " << time_query_dis_total << ", " << time_query_path_total << std::endl;
-    out << fixed << setprecision(8) << "hopdij_query_time: " << time_hop_dijkstra_query_dis_total << ", " << time_hop_dijkstra_query_path_total << std::endl;
-
+    << time_clean_labels_total << ", " << label_after_clean << std::endl
+    << fixed << setprecision(8) << "algo_query_time: " << time_query_dis_total << ", " << time_query_path_total << std::endl
+    << fixed << setprecision(8) << "hopdij_query_time: " << time_hop_dijkstra_query_dis_total << ", " << time_hop_dijkstra_query_path_total << std::endl;
     out.close();
 
     return 0;
@@ -1827,7 +1664,7 @@ int main (int argc, char** argv) {
 
     // Test frequency parameter
     int iteration_graph_times = 1;
-    int iteration_source_times = 1000, iteration_terminal_times = 1000;
+    iteration_source_times = 1000, iteration_terminal_times = 1000;
     
     // graph parameters
     // int V = 325729, E = 1117563;

@@ -6,6 +6,7 @@
 #include <nvml.h>
 #include <atomic>
 #include <cuda_runtime.h>
+#include <definition/cuda_err.cuh>
 
 typedef size_t SIZE_TYPE;
 const int MAX_BLOCKS_NUM = 96 * 8;
@@ -15,56 +16,6 @@ const uint64_t mask = 0x3FFULL;
 #define CALC_BLOCKS_NUM_LL(ITEMS_PER_BLOCK, CALC_SIZE) min((long long)MAX_BLOCKS_NUM, (CALC_SIZE - 1) / ITEMS_PER_BLOCK + 1)
 #define CALC_BLOCKS_NUM_NOLIMIT(ITEMS_PER_BLOCK, CALC_SIZE) ((CALC_SIZE - 1) / ITEMS_PER_BLOCK + 1)
 
-// 全局变量（实际项目中建议封装到类或结构体中）
-// std::vector<unsigned int> util_samples;
-// std::atomic<bool> monitor_flag{true};
-
-// void monitor_gpu_util(unsigned int device_id) {
-//     nvmlReturn_t result = nvmlInit();
-//     if (NVML_SUCCESS != result) {
-//         std::cerr << "NVML init failed: " << nvmlErrorString(result) << std::endl;
-//         return;
-//     }
-
-//     nvmlDevice_t device;
-//     result = nvmlDeviceGetHandleByIndex(device_id, &device);
-//     if (NVML_SUCCESS != result) {
-//         std::cerr << "Failed to get device handle: " << nvmlErrorString(result) << std::endl;
-//         nvmlShutdown();
-//         return;
-//     }
-
-//     while (monitor_flag) {
-//         nvmlUtilization_t util;
-//         result = nvmlDeviceGetUtilizationRates(device, &util);
-//         // if (NVML_SUCCESS == result) {
-//             util_samples.push_back(util.gpu);  // util.gpu 是 GPU 引擎的使用百分比（0~100）
-//         // }
-//         // 即使失败也继续，避免死循环卡住
-//         std::this_thread::sleep_for(std::chrono::milliseconds(10));
-//     }
-
-//     nvmlShutdown();
-// }
-
-// hub_vertex, parent_vertex, hop, distance
-
-// 64bits, to_vertex 24bits, hub_vertex 24bits, hop 3bits, distance 10bits
-// __forceinline__ __host__ __device__ int get_to_vertex (long long x) {
-//     return ((x >> 37) & 0xFFFFFF);
-// }
-// __forceinline__ __host__ __device__ int get_hub_vertex (long long x) {
-//     return ((x >> 13) & 0xFFFFFF); // 24-bit mask
-// }
-// __forceinline__ __host__ __device__ int get_hop (long long x) {
-//     return ((x >> 10) & 0x7); // 3-bit mask
-// }
-// __forceinline__ __host__ __device__ int get_distance (long long x) {
-//     return (x & 0x3FF); // 10-bit mask
-// }
-// __forceinline__ __host__ __device__ long long get_label (int to_vertex, int hub_vertex, int hop, int distance) {
-//     return ((long long)(to_vertex) << 37) | ((long long)(hub_vertex) << 13) | (hop << 10) | (distance);
-// }
 __forceinline__ __device__ int hash_pos (long long x) {
     return x % TABLE_SIZE;
 }
@@ -93,7 +44,7 @@ __forceinline__ __device__ int hash_52_to_22(uint64_t input) {
     return input % MOD;
 }
 
-__device__ void insertKernel_has (long long* d_table, long long d_input) {
+__forceinline__ __device__ void insertKernel_has (long long* d_table, long long d_input) {
     long long pos = hash_pos(d_input & (~0ull << 10));
     long long old;
     while (true) {
@@ -113,11 +64,11 @@ __device__ void insertKernel_has (long long* d_table, long long d_input) {
     }
 }
 
-__device__ long long change_label(long long x, int* source) {
+__forceinline__ __device__ long long change_label(long long x, int* source) {
     return get_label(source[get_to_vertex(x)], get_hub_vertex(x), get_hop(x), get_distance(x));
 }
 
-__device__ bool insertKernel_das (long long *d_table, int *source, long long d_input) {
+__forceinline__ __device__ bool insertKernel_das (long long *d_table, int *source, long long d_input) {
     long long pos = hash_pos(change_label(d_input, source) & (~0ull << 10));
     long long old;
     while (true) {
@@ -158,8 +109,7 @@ __global__ void clearKernel_das (long long *d_table, long long *d_input, int *so
     long long idx = threadIdx.x + blockIdx.x * blockDim.x;
     if (idx >= inputSize) return;
 
-    long long old; 
-
+    long long old;
     long long d_input_change = change_label(d_input[idx], source);
     long long pos = hash_pos(d_input_change & (~0ull << 10));
     while (true) {
@@ -194,7 +144,7 @@ __global__ void clearKernel_has (long long *d_table, long long* d_input, int *so
     }
 }
 
-__device__ int queryKernel_single (long long *d_table, long long d_input) {
+__forceinline__ __device__ int queryKernel_single (long long *d_table, long long d_input) {
     long long pos = hash_pos(d_input & (~0ull << 10));
     long long old;
     int x = 0;
@@ -438,27 +388,27 @@ __global__ void Tranverse_kernel (
     int V
 ) {
     long long tid = blockIdx.x * blockDim.x + threadIdx.x;
-    if (tid < T_size[0]) {
-        long long entry = T1[tid];
-        int hop = get_hop(entry);
-        // if (hop <= 1) return;
-        // int to_vertex = source[get_to_vertex(entry)];
-        int to_vertex = source[get_to_vertex(entry)];
-        int hub_vertex = get_hub_vertex(entry);
-        int dis = get_distance(entry);
-        flag[tid] = 1;
-        
-        for (int i = 1; i < hop; i ++) {
-            long long idx = (long long) V * i + to_vertex;
-            long long posl = __ldg(T_offset_begin + idx);
-            long long posr = __ldg(T_offset_end + idx);
-            for (long long j = posl; j < posr; j ++) {
-                long long TT = T2[j];
-                int mid_vertex = get_hub_vertex(TT);
-                if (get_distance(TT) + queryKernel_single(has, get_label(hub_vertex, mid_vertex, hop - i, 0)) <= dis) {
-                    flag[tid] = 0;
-                    return;
-                }
+    if (tid >= T_size[0]) return;
+
+    long long entry = T1[tid];
+    int hop = get_hop(entry);
+    // if (hop <= 1) return;
+    // int to_vertex = source[get_to_vertex(entry)];
+    int to_vertex = source[get_to_vertex(entry)];
+    int hub_vertex = get_hub_vertex(entry);
+    int dis = get_distance(entry);
+    flag[tid] = 1;
+    
+    for (int i = 1; i < hop; i ++) {
+        long long idx = (long long) V * i + to_vertex;
+        long long posl = __ldg(T_offset_begin + idx);
+        long long posr = __ldg(T_offset_end + idx);
+        for (long long j = posl; j < posr; j ++) {
+            long long TT = T2[j];
+            int mid_vertex = get_hub_vertex(TT);
+            if (get_distance(TT) + queryKernel_single(has, get_label(hub_vertex, mid_vertex, hop - i, 0)) <= dis) {
+                flag[tid] = 0;
+                return;
             }
         }
     }
@@ -467,133 +417,100 @@ __global__ void Tranverse_kernel (
 __global__ void updateHas (long long *T, long long T_start, long long *has, unsigned long long T_size, 
     long long *T_offset_begin, long long *T_offset_end, int *source, long long V, int hop, int hop_cst) {
     long long tid = blockIdx.x * blockDim.x + threadIdx.x;
-    if (tid < T_size) {
-        long long TT = T[tid];
-        TT = change_label(TT, source);
-        for (int i = hop; i < hop_cst; i ++) {
-            insertKernel_has (has, TT);
-            TT += (1 << 10);
-        }
-        if (get_to_vertex(TT) != source[get_to_vertex(T[tid - 1])]) {
-            T_offset_begin[V * hop + get_to_vertex(TT)] = T_start + tid;
-        }
-        if (get_to_vertex(TT) != source[get_to_vertex(T[tid + 1])]) {
-            T_offset_end[V * hop + get_to_vertex(TT)] = T_start + tid + 1;
-        }
+    if (tid >= T_size) return;
+
+    long long TT = T[tid];
+    TT = change_label(TT, source);
+    for (int i = hop; i < hop_cst; i ++) {
+        insertKernel_has (has, TT);
+        TT += (1 << 10);
+    }
+    if (get_to_vertex(TT) != source[get_to_vertex(T[tid - 1])]) {
+        T_offset_begin[V * hop + get_to_vertex(TT)] = T_start + tid;
+    }
+    if (get_to_vertex(TT) != source[get_to_vertex(T[tid + 1])]) {
+        T_offset_end[V * hop + get_to_vertex(TT)] = T_start + tid + 1;
     }
 }
 
 __global__ void init_T (int group_size, long long *T, long long *has, int *nid, long long *T_offset_begin, long long *T_offset_end, 
     int *out_edge, int *out_edge_weight, int *out_pointer, int hop_cst) {
     long long tid = blockIdx.x * blockDim.x + threadIdx.x;
-    if (tid < group_size) {
-        int v = nid[tid];
-        T[tid] = get_label(v, v, 0, 0); // to, hub, hop, dis
-        long long TT = T[tid];
-        for (int i = 0; i <= hop_cst; i ++) {
-            insertKernel_has (has, TT);
-            TT += (1 << 10);
-        }
-        T[tid] = get_label(out_pointer[v], v, 0, 0);
-        T_offset_begin[v] = tid + 1;
-        T_offset_end[v] = tid + 2;
+    if (tid >= group_size) return;
+
+    int v = nid[tid];
+    // T[tid] = get_label(v, v, 0, 0);
+    long long TT = get_label(v, v, 0, 0); // to, hub, hop, dis
+    for (int i = 0; i <= hop_cst; i ++) {
+        insertKernel_has (has, TT);
+        TT += (1 << 10);
     }
+    T[tid] = get_label(out_pointer[v], v, 0, 0);
+    T_offset_begin[v] = tid + 1;
+    T_offset_end[v] = tid + 2;
 }
 
 __global__ void init_T_offset (long long *T_offset_begin, long long *T_offset_end, long long V_hop) {
     long long tid = blockIdx.x * blockDim.x + threadIdx.x;
-    if (tid < V_hop) {
-        T_offset_begin[tid] = 0;
-        T_offset_end[tid] = 0;
-    }
+    if (tid >= V_hop) return;
+
+    T_offset_begin[tid] = 0;
+    T_offset_end[tid] = 0;
 }
 
 __global__ void check_hash_(long long *h_table) {
     long long tid = blockIdx.x * blockDim.x + threadIdx.x;
-    if (tid <= TABLE_SIZE_MINUS_ONE) {
-        if (h_table[tid]) {
-            printf("shit!!!!! %d %d %d %d\n", get_to_vertex(h_table[tid]), get_hub_vertex(h_table[tid]),
-            get_hop(h_table[tid]), get_distance(h_table[tid]));
-        }
+    if (tid <= TABLE_SIZE_MINUS_ONE && h_table[tid]) {
+        printf("check hash error. %d, %d, %d, %d\n", get_to_vertex(h_table[tid]), get_hub_vertex(h_table[tid]),
+                    get_hop(h_table[tid]), get_distance(h_table[tid]));
     }
 }
 
 // the proces of generate labels
 void label_gen_v4 (CSR_graph<weight_type>& input_graph, hop_constrained_case_info_v2 *info, long long *L, 
         long long &L_size, std::vector<int>& nid_vec, int nid_vec_id, double &sort_time_record) {
-    // monitor_flag = true;
-    // util_samples.clear();  // 清空前次数据
-    // std::thread monitor(monitor_gpu_util, 0); // 启动监控线程，监控 GPU 0
-
-    cudaError_t err;
-    err = cudaGetLastError();
-    if (err != cudaSuccess) {
-        printf("Kernel launch error -2: %s\n", cudaGetErrorString(err));
-        exit(0);
-    }
+    
     constexpr int THREADS_NUM = 256;
-    constexpr int THREADS = 256;
     long long V = input_graph.OUTs_Neighbor_start_pointers.size() - 1;
     long long E = input_graph.OUTs_Edges.size();
+
+    // out_edge, out_edge_weight, out_pointer
     int* out_edge = input_graph.out_edge;
     int* out_edge_weight = input_graph.out_edge_weight;
     int* out_pointer = input_graph.out_pointer;
     int* source = input_graph.source;
     int* inv = input_graph.inv;
-    // out_edge, out_edge_weight, out_pointer
+    
     long long hop_cst = info->hop_cst;
     long long group_size = info->nid_size[nid_vec_id];
-    int *nid = info->nid[nid_vec_id];
+    int* nid = info->nid[nid_vec_id];
     long long* T = info->T;
     long long* H = info->has;
     long long* D = info->das;
-    long long* D_sort_temp = info->D_sort_temp; // 排序辅助空间
+    long long* D_sort_temp = info->D_sort_temp;
     long long* T_offset_begin = info->T_offset_begin;
     long long* T_offset_end = info->T_offset_end;
     char* flag = info->flag;
 
-    err = cudaGetLastError();
-    if (err != cudaSuccess) {
-        printf("Kernel launch error -1: %s\n", cudaGetErrorString(err));
-        exit(0);
-    }
-
     unsigned long long *T_pre_offset, *T_after_offset;
+    long long *d_num_selected;
     cudaMalloc(&T_pre_offset, sizeof(unsigned long long));
     cudaMalloc(&T_after_offset, sizeof(unsigned long long));
-
-    long long *d_num_selected;
     cudaMalloc(&d_num_selected, sizeof(long long));
     cudaDeviceSynchronize();
 
-    // 按照hop生成label
     unsigned long long last_pos = 1, last_size[1] = {group_size}; // 上一次生成到的位置
     long long inf_ll[1] = {0x7FFFFFFFFFFFFFFFLL};
 
-    // 初始化
-    err = cudaGetLastError();
-    if (err != cudaSuccess) {
-        printf("Kernel launch error 0: %s\n", cudaGetErrorString(err));
-        exit(0);
-    }
-    // printf("group_size: %d\n", group_size);
     long long BLOCKS_NUM = CALC_BLOCKS_NUM_NOLIMIT(THREADS_NUM, V * (hop_cst + 1));
     init_T_offset<<<BLOCKS_NUM, THREADS_NUM>>>(T_offset_begin, T_offset_end, V * (hop_cst + 1));
     cudaDeviceSynchronize();
-    err = cudaGetLastError();
-    if (err != cudaSuccess) {
-        printf("Kernel launch error 1: %s\n", cudaGetErrorString(err));
-        exit(0);
-    }
+    CHECK_CUDA_KERNEL();
     
     BLOCKS_NUM = CALC_BLOCKS_NUM_NOLIMIT(THREADS_NUM, group_size);
     init_T<<<BLOCKS_NUM, THREADS_NUM>>>(group_size, T + last_pos, H, nid, T_offset_begin, T_offset_end, out_edge, out_edge_weight, out_pointer, hop_cst);
     cudaDeviceSynchronize();
-    err = cudaGetLastError();
-    if (err != cudaSuccess) {
-        printf("Kernel launch error 2: %s\n", cudaGetErrorString(err));
-        exit(0);
-    }
+    CHECK_CUDA_KERNEL();
     
     int print_tag = 0;
     unsigned long long zero = 0;
@@ -612,11 +529,7 @@ void label_gen_v4 (CSR_graph<weight_type>& input_graph, hop_constrained_case_inf
         HSDL_gather_kernel<THREADS_NUM> <<<BLOCKS_NUM, THREADS_NUM>>>(T + last_pos, T_pre_offset, T + last_pos + last_size[0], 
             T_after_offset, D, out_edge, out_edge_weight, out_pointer, inv, source, hop);
         cudaDeviceSynchronize();
-        err = cudaGetLastError();
-        if (err != cudaSuccess) {
-            printf("Kernel launch error 3: %s\n", cudaGetErrorString(err));
-            exit(0);
-        }
+        CHECK_CUDA_KERNEL();
         
         last_pos += last_size[0];
         cudaMemcpy(last_size, T_after_offset, sizeof(unsigned long long), cudaMemcpyDeviceToHost);
@@ -627,135 +540,86 @@ void label_gen_v4 (CSR_graph<weight_type>& input_graph, hop_constrained_case_inf
         BLOCKS_NUM = CALC_BLOCKS_NUM_NOLIMIT(THREADS_NUM, last_size[0]);
         clearKernel_das <<<BLOCKS_NUM, THREADS_NUM>>> (D, T + last_pos, source, last_size[0]);
         cudaDeviceSynchronize();
-        err = cudaGetLastError();
-        if (err != cudaSuccess) {
-            printf("Kernel launch error 4: %s\n", cudaGetErrorString(err));
-            exit(0);
-        }
-        
-        // printf("Clear done !!\n");
+        CHECK_CUDA_KERNEL();
+        // printf("clear done.\n");
 
-        long long *output;
-        if (print_tag) {
-            output = (long long *)malloc(1000);
-            cudaMemcpy(output, T + last_pos, last_size[0] * sizeof(long long), cudaMemcpyDeviceToHost);
-            cudaDeviceSynchronize();
-            for (long long i = 0; i < last_size[0]; i++) {
-                printf("gen1 output, to, par, hub, h, dis: %d, %d, %d, %d, %d\n", input_graph.ARRAY_source[get_to_vertex(output[i])], input_graph.OUTs_Edges[get_to_vertex(output[i])],\
-                                                                            get_hub_vertex(output[i]), get_hop(output[i]), get_distance(output[i]));
-            }
-        }
+        // long long *output;
+        // if (print_tag) {
+        //     output = (long long *)malloc(1000);
+        //     cudaMemcpy(output, T + last_pos, last_size[0] * sizeof(long long), cudaMemcpyDeviceToHost);
+        //     cudaDeviceSynchronize();
+        //     for (long long i = 0; i < last_size[0]; i++) {
+        //         printf("gen1 output, to, par, hub, h, dis: %d, %d, %d, %d, %d\n", input_graph.ARRAY_source[get_to_vertex(output[i])], input_graph.OUTs_Edges[get_to_vertex(output[i])],\
+        //                                                                     get_hub_vertex(output[i]), get_hop(output[i]), get_distance(output[i]));
+        //     }
+        // }
 
         // step2 sort
         auto t1 = std::chrono::high_resolution_clock::now();
         Sort_kernel(T, last_size[0], last_pos, D_sort_temp);
+        cudaDeviceSynchronize();
+        CHECK_CUDA_KERNEL();
         auto t2 = std::chrono::high_resolution_clock::now();
         double ms = std::chrono::duration<double, std::milli>(t2 - t1).count();
-        sort_time_record += ms / 1000;
-        cudaDeviceSynchronize();
-        // printf("Sort done !!\n");
-        // printf("size: %llu, %llu\n", last_pos, last_size[0]);
+        sort_time_record += ms / 1000.0;
+        // printf("sort done.\n");
 
-        if (print_tag) {
-            output = (long long *)malloc(1000);
-            cudaMemcpy(output, T + last_pos, last_size[0] * sizeof(long long), cudaMemcpyDeviceToHost);
-            cudaDeviceSynchronize();
-            for (long long i = 0; i < last_size[0]; i++) {
-                printf("gen2 output, to, par, hub, h, dis: %d, %d, %d, %d, %d\n", input_graph.ARRAY_source[get_to_vertex(output[i])], input_graph.OUTs_Edges[get_to_vertex(output[i])],\
-                                                                            get_hub_vertex(output[i]), get_hop(output[i]), get_distance(output[i]));
-            }
-        }
+        // if (print_tag) {
+        //     output = (long long *)malloc(1000);
+        //     cudaMemcpy(output, T + last_pos, last_size[0] * sizeof(long long), cudaMemcpyDeviceToHost);
+        //     cudaDeviceSynchronize();
+        //     for (long long i = 0; i < last_size[0]; i++) {
+        //         printf("gen2 output, to, par, hub, h, dis: %d, %d, %d, %d, %d\n", input_graph.ARRAY_source[get_to_vertex(output[i])], input_graph.OUTs_Edges[get_to_vertex(output[i])],\
+        //                                                                     get_hub_vertex(output[i]), get_hop(output[i]), get_distance(output[i]));
+        //     }
+        // }
 
-        // step3 遍历
+        // step3 tranverse
         BLOCKS_NUM = CALC_BLOCKS_NUM_NOLIMIT(THREADS_NUM, last_size[0]);
         Tranverse_kernel <<<BLOCKS_NUM, THREADS_NUM>>> (T + last_pos, T, H, T_offset_begin, T_offset_end, source, flag, T_after_offset, V);
         cudaDeviceSynchronize();
-        err = cudaGetLastError();
-        if (err != cudaSuccess) {
-            printf("Kernel launch error 5: %s\n", cudaGetErrorString(err));
-            exit(0);
-        }
-        
-        // printf("Tranverse done !!\n");
+        CHECK_CUDA_KERNEL();
+        // printf("tranverse done.\n");
         
         // step4 gather
         Gather_kernel(T + last_pos, flag, last_size[0], D_sort_temp, d_num_selected);
         cudaMemcpy(&last_size, d_num_selected, sizeof(long long), cudaMemcpyDeviceToHost);
-        // printf("num_selected: %lld\n", last_size[0]);
         cudaDeviceSynchronize();
+        CHECK_CUDA_KERNEL();
 
-        if (print_tag) {
-            cudaMemcpy(output, T + last_pos, last_size[0] * sizeof(long long), cudaMemcpyDeviceToHost);
-            cudaDeviceSynchronize();
-            for (long long i = 0; i < last_size[0]; i++) {
-                printf("gen3 output, to, par, hub, h, dis: %d, %d, %d, %d, %d\n", input_graph.ARRAY_source[get_to_vertex(output[i])], input_graph.OUTs_Edges[get_to_vertex(output[i])],\
-                                                                            get_hub_vertex(output[i]), get_hop(output[i]), get_distance(output[i]));
-            }
-        }
+        // if (print_tag) {
+        //     cudaMemcpy(output, T + last_pos, last_size[0] * sizeof(long long), cudaMemcpyDeviceToHost);
+        //     cudaDeviceSynchronize();
+        //     for (long long i = 0; i < last_size[0]; i++) {
+        //         printf("gen3 output, to, par, hub, h, dis: %d, %d, %d, %d, %d\n", input_graph.ARRAY_source[get_to_vertex(output[i])], input_graph.OUTs_Edges[get_to_vertex(output[i])],\
+        //                                                                     get_hub_vertex(output[i]), get_hop(output[i]), get_distance(output[i]));
+        //     }
+        // }
 
-        // step5 更新哈希
+        // step5 update hash
         // if (hop < hop_cst) updateHas<<<BLOCKS_NUM, THREADS_NUM>>>(T + last_pos, last_pos, H, last_size[0], T_offset_begin, T_offset_end, V, hop, hop_cst);
         updateHas<<<BLOCKS_NUM, THREADS_NUM>>>(T + last_pos, last_pos, H, last_size[0], T_offset_begin, T_offset_end, source, V, hop, hop_cst);
         cudaDeviceSynchronize();
-        err = cudaGetLastError();
-        if (err != cudaSuccess) {
-            printf("Kernel launch error 6: %s\n", cudaGetErrorString(err));
-            exit(0);
-        }
-
-        // printf("updateHas done!!!\n");
+        CHECK_CUDA_KERNEL();
+        // printf("updateHas done.\n");
     }
-    err = cudaGetLastError();
-    if (err != cudaSuccess) {
-        printf("Kernel launch error 7: %s\n", cudaGetErrorString(err));
-        exit(0);
-    }
-    BLOCKS_NUM = CALC_BLOCKS_NUM_NOLIMIT(THREADS_NUM, last_pos + last_size[0] - 1);
-    clearKernel_has<<<BLOCKS_NUM, THREADS_NUM>>>(H, T + 1, source, last_pos + last_size[0] - 1, hop_cst);
-    // BLOCKS_NUM = CALC_BLOCKS_NUM_NOLIMIT(THREADS_NUM, last_pos - 1);
-    // clearKernel_has<<<BLOCKS_NUM, THREADS_NUM>>>(H, T + 1, last_pos - 1);
+    last_pos += last_size[0] - 1;
+    BLOCKS_NUM = CALC_BLOCKS_NUM_NOLIMIT(THREADS_NUM, last_pos);
+    clearKernel_has<<<BLOCKS_NUM, THREADS_NUM>>>(H, T + 1, source, last_pos, hop_cst);
     cudaDeviceSynchronize();
+    CHECK_CUDA_KERNEL();
+    // printf("clearKernel done.\n");
 
-    // get gpu utility
-    // monitor_flag = false;    // 停止监控
-    // monitor.join();          // 等待监控线程结束
-    // // ====== 输出结果 ======
-    // std::cout << "Captured " << util_samples.size() << " GPU utilization samples:\n";
-    // for (size_t i = 0; i < util_samples.size(); ++i) {
-    //     std::cout << "Sample [" << i << "]: " << util_samples[i] << "%\n";
-    // }
-    // // 可选：计算平均利用率
-    // if (!util_samples.empty()) {
-    //     double sum = 0.0;
-    //     for (auto v : util_samples) sum += v;
-    //     double avg = sum / util_samples.size();
-    //     std::cout << "Average GPU utilization: " << avg << "%\n";
-    // }
-
-    err = cudaGetLastError();
-    if (err != cudaSuccess) {
-        printf("Kernel launch error 8: %s\n", cudaGetErrorString(err));
-        exit(0);
-    }
-    // printf("clearKernel done!!!\n");
-    // 从设备拷贝到主机 vector
-    auto start = std::chrono::high_resolution_clock::now();
-    cudaMemcpy(L, T + 1, (last_pos + last_size[0] - 1) * sizeof(long long), cudaMemcpyDeviceToHost);
+    cudaMemcpy(L, T + 1, last_pos * sizeof(long long), cudaMemcpyDeviceToHost);
     cudaDeviceSynchronize();
-    // 在核函数后立即检查
-    err = cudaGetLastError();
-    if (err != cudaSuccess) {
-        printf("Kernel launch error 9: %s\n", cudaGetErrorString(err));
-        exit(0);
-    }
-    auto end = std::chrono::high_resolution_clock::now();
-    double time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count() / 1e9;
+    CHECK_CUDA_KERNEL();
     
-    // L_size = 0;
-    L_size += last_pos + last_size[0] - 1;
-    // printf("time memcpy: %.6lf\n", time);
-
+    L_size += last_pos;
+    
     // BLOCKS_NUM = CALC_BLOCKS_NUM_NOLIMIT(THREADS_NUM, TABLE_SIZE);
     // check_hash_<<<BLOCKS_NUM, THREADS_NUM>>>(H);
     // cudaDeviceSynchronize();
+    // CHECK_CUDA_KERNEL();
+
+    return;
 }

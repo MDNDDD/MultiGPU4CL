@@ -63,6 +63,20 @@ public:
 	int size() {
 		return ADJs.size();
 	}
+	
+	inline int vertex_num () {
+		return ADJs.size();
+	}
+	
+	inline int edge_num () {
+		int size = ADJs.size();
+		int e_size = 0;
+		for (int i = 0; i < size; i++) {
+			e_size += ADJs[i].size();
+		}
+		return e_size;
+	}
+
 	std::vector<std::pair<int, weight_type>>& operator[](int i){ 
 		return ADJs[i];
 	}
