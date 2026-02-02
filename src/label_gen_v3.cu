@@ -1,5 +1,3 @@
-#pragma once
-
 #include "label/gen_label.cuh"
 #include "cub/cub.cuh"
 #include <cuda_runtime.h>
@@ -11,7 +9,6 @@
 typedef size_t SIZE_TYPE;
 const int MAX_BLOCKS_NUM = 96 * 8;
 #define FULL_MASK 0xffffffff
-const uint64_t mask = 0x3FFULL;
 #define CALC_BLOCKS_NUM(ITEMS_PER_BLOCK, CALC_SIZE) min(MAX_BLOCKS_NUM, (CALC_SIZE - 1) / ITEMS_PER_BLOCK + 1)
 #define CALC_BLOCKS_NUM_LL(ITEMS_PER_BLOCK, CALC_SIZE) min((long long)MAX_BLOCKS_NUM, (CALC_SIZE - 1) / ITEMS_PER_BLOCK + 1)
 #define CALC_BLOCKS_NUM_NOLIMIT(ITEMS_PER_BLOCK, CALC_SIZE) ((CALC_SIZE - 1) / ITEMS_PER_BLOCK + 1)

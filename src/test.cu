@@ -21,7 +21,7 @@
 
 #include <vgroup/CDLP_group.cuh>
 
-std::map<std::pair<int, int>, int > edge_id;
+boost::random::mt19937 boost_random_time_seed { static_cast<std::uint32_t>(std::time(0)) }; // Random seed 
 
 vector<vector<hop_constrained_two_hop_label> > L_hybrid;
 
@@ -31,54 +31,30 @@ hop_constrained_case_info_v2 *info_gpu;
 graph_v_of_v<int> instance_graph;
 CSR_graph<weight_type> csr_graph;
 Graph_pool<int> graph_pool;
-
-boost::random::mt19937 boost_random_time_seed { static_cast<std::uint32_t>(std::time(0)) }; // Random seed 
+std::map<std::pair<int, int>, int> edge_id;
 
 struct Executive_Core {
     int id = 0;
     double time_use = 0.0;
     int core_type = 0; // 0: cpu, 1: gpu
+
     Executive_Core() = default;
-    Executive_Core (int x, double y, int z) : id(x), time_use(y), core_type(z) {}
+    Executive_Core(int x, double y, int z) : id(x), time_use(y), core_type(z) {}
+
+    friend bool operator<(const Executive_Core& a, const Executive_Core& b) {
+        if (a.time_use == b.time_use) return a.id > b.id;
+        return a.time_use > b.time_use;
+    }
 };
-inline bool operator < (Executive_Core a, Executive_Core b) {
-    if (a.time_use == b.time_use) return a.id > b.id;
-    return a.time_use > b.time_use;
-}
 
-bool compare_hop_constrained_two_hop_label_v2 (hub_type &i, hub_type &j) {
-	if (i.hub_vertex != j.hub_vertex) {
-		return i.hub_vertex < j.hub_vertex;
-	} else if (i.hop != j.hop) {
-		return i.hop < j.hop;
-	} else {
-		return i.distance < j.distance;
-	}
-}
-
-void graph_v_of_v_to_LDBC (LDBC<weight_type> &graph, graph_v_of_v<int> &input_graph) {
+inline void graph_v_of_v_to_LDBC (LDBC<weight_type> &graph, graph_v_of_v<int> &input_graph) {
     int N = input_graph.size();
-    int EE = 0;
-    for (int i = 0; i < N; i++) {
+    for (int i = 0; i < N; ++ i) {
         int v_adj_size = input_graph[i].size();
-        for (int j = 0; j < v_adj_size; j++) {
+        for (int j = 0; j < v_adj_size; ++ j) {
             int adj_v = input_graph[i][j].first;
             int ec = input_graph[i][j].second;
             graph.add_edge(i, adj_v, ec);
-        }
-    }
-}
-
-void query_mindis_with_hub_host (int V, int x, int y, int hop_cst,
-                vector<vector<hub_type> >&L, weight_type *distance) {
-    (*distance) = 1e9;
-    for (int i = 0; i < L[x].size(); i++){
-        for (int j = 0; j < L[y].size(); j++) {
-            if (L[x][i].hub_vertex == L[y][j].hub_vertex) {
-                if (L[x][i].hop + L[y][j].hop <= hop_cst) {
-                    (*distance) = min((*distance), L[x][i].distance + L[y][j].distance);
-                }
-            }
         }
     }
 }
@@ -87,25 +63,23 @@ struct Query {
     int u, v, h;
 };
 vector<Query> queries;
-int query_num = 0;
 inline void read_query (string query_path) {
     std::ifstream infile(query_path);
     int u, v, h;
     while (infile >> u >> v >> h) {
-        query_num ++;
         queries.push_back({u, v, h});
     }
     infile.close();
 }
 
-void GPU_HSDL_checker (vector<vector<hub_type_v2> >&LL, graph_v_of_v<int> &instance_graph,
+inline void GPU_HSDL_checker (vector<vector<hub_type_v2> >&LL, graph_v_of_v<int> &instance_graph,
                         int iteration_source_times, int iteration_terminal_times, int hop_bounded, int check_path) {
 
     boost::random::uniform_int_distribution<> vertex_range{ static_cast<int>(0), static_cast<int>(instance_graph.size() - 1) };
     // boost::random::uniform_int_distribution<> hop_range{ static_cast<int>(1), static_cast<int>(hop_bounded) };
     boost::random::uniform_int_distribution<> hop_range{ static_cast<int>(0), static_cast<int>(hop_bounded) };
 
-    printf("Checker Start.\n");
+    printf("checker start random.\n");
 
     double time_query_dis_total = 0.0, time_query_path_total = 0.0, time_increase = 0.0;
     for (int yy = 0; yy < iteration_source_times; yy++) {
@@ -144,7 +118,6 @@ void GPU_HSDL_checker (vector<vector<hub_type_v2> >&LL, graph_v_of_v<int> &insta
                 }
                 printf("};\n");
                 return;
-                //exit(0);
             }else if (distances[terminal] != std::numeric_limits<int>::max()) {
                 // cout << "correct !!!" << endl;
                 // cout << "source, terminal, hopcst = " << source << ", "<< terminal << ", " << hop_cst << endl;
@@ -173,13 +146,11 @@ void GPU_HSDL_checker (vector<vector<hub_type_v2> >&LL, graph_v_of_v<int> &insta
                 // printf("path_dis, q_dis: %d, %d\n", path_dis, q_dis);
                 if (abs(q_dis - path_dis) > 1e-2) {
                     // instance_graph.print();
-                    cout << "source = " << source << endl;
-                    cout << "terminal = " << terminal << endl;
-                    cout << "hop_cst = " << hop_cst << endl;
-                    std::cout << "print_vector_pair_int:" << std::endl;
+                    cout << "source, terminal, hopcst = " << source << ", "<< terminal << ", " << hop_cst << endl;
+                    cout << "print_vector_pair_int:" << endl;
                     for (int i = 0; i < path.size(); i++) {
-                        std::cout << "item: [" << path[i].first << "," << path[i].second << "], |" 
-                                  << instance_graph.edge_weight(path[i].first, path[i].second) << "|" << std::endl;
+                        cout << "item: [" << path[i].first << "," << path[i].second << "], |" 
+                                  << instance_graph.edge_weight(path[i].first, path[i].second) << "|" << endl;
                     }
                     cout << "query_dis = " << q_dis << endl;
                     cout << "path_dis = " << path_dis << endl;
@@ -190,22 +161,20 @@ void GPU_HSDL_checker (vector<vector<hub_type_v2> >&LL, graph_v_of_v<int> &insta
             }
         }
     }
-    
-    printf("Checker End.\n");
-    printf("Query distance time: %.8lf\n", time_query_dis_total);
-    printf("Query path time: %.8lf\n", time_query_path_total);
-    printf("Query time increase: %.8lf\n", time_increase);
+    printf("checker end.\n");
+    printf("query distance time: %.8lf\n", time_query_dis_total);
+    printf("query path time: %.8lf\n", time_query_path_total);
+    printf("query time increase: %.8lf\n", time_increase);
     return;
 }
 
 double time_query_dis_total = 0.0, time_query_path_total = 0.0;
 double time_hop_dijkstra_query_dis_total = 0.0, time_hop_dijkstra_query_path_total = 0.0;
-void GPU_HSDL_checker_query_file (vector<vector<hub_type_v2> >&LL, graph_v_of_v<int> &instance_graph,
+inline void GPU_HSDL_checker_query_file (vector<vector<hub_type_v2> >&LL, graph_v_of_v<int> &instance_graph,
                         int iteration_source_times, int iteration_terminal_times, int hop_bounded, int check_path) {
-
-    printf("Checker Start.\n");
+    printf("checker start query file.\n");
     
-    for (int yy = 0; yy < 10000; yy ++) {
+    for (int yy = 0; yy < queries.size(); yy ++) {
         std::vector<weight_type> distances; // record shortest path
         std::vector<int> path;
 
@@ -239,8 +208,8 @@ void GPU_HSDL_checker_query_file (vector<vector<hub_type_v2> >&LL, graph_v_of_v<
 
         if (abs(q_dis - distances[terminal]) > 1e-2 && yy < 100) {
             cout << "source, terminal, hopcst = " << source << ", "<< terminal << ", " << hop_cst << endl;
-            cout << fixed << setprecision(5) << "dis = " << q_dis << endl;
-            cout << fixed << setprecision(5) << "distances[terminal] = " << distances[terminal] << endl;
+            cout << fixed << setprecision(8) << "dis = " << q_dis << endl;
+            cout << fixed << setprecision(8) << "distances[terminal] = " << distances[terminal] << endl;
             cout << endl;
             printf("L[%d]: %d {", source, LL[source].size());
             for (int i = 0; i < LL[source].size(); i ++) {
@@ -253,7 +222,6 @@ void GPU_HSDL_checker_query_file (vector<vector<hub_type_v2> >&LL, graph_v_of_v<
             }
             printf("};\n");
             return;
-            //exit(0);
         } else {
             // cout << "correct !!!" << endl;
             // cout << "source, terminal, hopcst = " << source << ", "<< terminal << ", " << hop_cst << endl;
@@ -282,13 +250,11 @@ void GPU_HSDL_checker_query_file (vector<vector<hub_type_v2> >&LL, graph_v_of_v<
             // printf("path_dis, q_dis: %d, %d\n", path_dis, q_dis);
             if (abs(q_dis - path_dis) > 1e-2) {
                 // instance_graph.print();
-                cout << "source = " << source << endl;
-                cout << "terminal = " << terminal << endl;
-                cout << "hop_cst = " << hop_cst << endl;
-                std::cout << "print_vector_pair_int:" << std::endl;
+                cout << "source, terminal, hopcst = " << source << ", "<< terminal << ", " << hop_cst << endl;
+                cout << "print_vector_pair_int:" << endl;
                 for (int i = 0; i < path.size(); i++) {
-                    std::cout << "item: [" << path[i].first << "," << path[i].second << "], |" 
-                                << instance_graph.edge_weight(path[i].first, path[i].second) << "|" << std::endl;
+                    cout << "item: [" << path[i].first << "," << path[i].second << "], |" 
+                                << instance_graph.edge_weight(path[i].first, path[i].second) << "|" << endl;
                 }
                 cout << "query_dis = " << q_dis << endl;
                 cout << "path_dis = " << path_dis << endl;
@@ -298,73 +264,12 @@ void GPU_HSDL_checker_query_file (vector<vector<hub_type_v2> >&LL, graph_v_of_v<
             }
         }
     }
-    printf("Checker End.\n");
-    printf("Query distance time: %.8lf\n", time_query_dis_total);
-    printf("Query path time: %.8lf\n", time_query_path_total);
-    printf("hopDijkstra Query distance time: %.8lf\n", time_hop_dijkstra_query_dis_total);
-    printf("hopDijkstra Query path time: %.8lf\n", time_hop_dijkstra_query_path_total);
-}
-
-int max_N_ID_for_mtx_group_599 = 1e7;
-// vector<std::shared_timed_mutex> mtx_group_599(max_N_ID_for_mtx_group_599);
-// queue<int> Qid_group_599;
-queue<pair<int, int> > que_get_group_bfs[100];
-
-static void get_bfs_group_vertices_thread_function (int group_id, int hop_cst) {
-    // vertex, hop
-    queue<pair<int, int> > q;
-    set<int> s;
-
-    for (int i = 0; i < graph_pool.graph_group[group_id].size(); ++i) {
-        q.push(make_pair(graph_pool.graph_group[group_id][i], 0));
-        graph_pool.graph_group_bfs[group_id].push_back(graph_pool.graph_group[group_id][i]);
-        s.insert(graph_pool.graph_group[group_id][i]);
-    }
-
-    while (!q.empty()) {
-        pair<int, int> x = q.front();
-        q.pop();
-
-        // if (s.find(x.first) == s.end()) {
-        //     s.insert(x.first);
-        //     graph_pool.graph_group_bfs[group_id].push_back(x.first);
-        // }
-
-        if (x.second >= hop_cst) continue;
-
-        int v_adj_size = instance_graph[x.first].size();
-
-        for (int i = 0; i < v_adj_size; i++) {
-            int adj_v = instance_graph[x.first][i].first;
-
-            if (s.find(adj_v) == s.end()) {
-                q.push(make_pair(adj_v, x.second + 1));
-                graph_pool.graph_group_bfs[group_id].push_back(adj_v);
-                s.insert(adj_v);
-            }
-        }
-    }
-}
-
-void get_bfs_group_vertices (int hop_cst) {
-    std::vector<std::future<int>> results;
-    ThreadPool pool(100);
-
-    for (int group_id = 0; group_id < graph_pool.graph_group.size(); ++ group_id) {
-        results.emplace_back(pool.enqueue([group_id, hop_cst] {
-            get_bfs_group_vertices_thread_function(group_id, hop_cst);
-            return 1;
-        }));
-    }
-    for (auto &&result : results) {
-        result.get();
-    }
-    results.clear();
-    results.shrink_to_fit();
-
-    for (int group_id = 0; group_id < graph_pool.graph_group.size(); ++group_id) {
-        printf("graph_pool, graph_pool_bfs: %d, %d\n", graph_pool.graph_group[group_id].size(), graph_pool.graph_group_bfs[group_id].size());
-    }
+    printf("checker end.\n");
+    printf("query distance time: %.8lf\n", time_query_dis_total);
+    printf("query path time: %.8lf\n", time_query_path_total);
+    printf("hopDijkstra query distance time: %.8lf\n", time_hop_dijkstra_query_dis_total);
+    printf("hopDijkstra query path time: %.8lf\n", time_hop_dijkstra_query_path_total);
+    return;
 }
 
 // read the graph file and generate csr_graph
@@ -388,7 +293,7 @@ void read_graph (int &generate_new_graph, int &V, int &E, string &data_path) {
     LDBC<weight_type> graph(V);
     graph_v_of_v_to_LDBC(graph, instance_graph);
     csr_graph = toCSR(graph);
-    printf("Generation Graph Successful!\n");
+    printf("generation graph successful.\n");
 }
 
 inline void sub_graph (int &use_cd, int &V, int &E, int &G_max, int &Distributed_Graph_Num, double &time_cd_total) {
@@ -412,7 +317,6 @@ inline void sub_graph (int &use_cd, int &V, int &E, int &G_max, int &Distributed
         Distributed_Graph_Num = 3;
         graph_pool.graph_group = { {0, 3, 7}, {1, 2, 4}, {5, 6} };
     }
-    printf("G_max: %d\n", G_max);
 }
 
 void set_info (int &algo, int &hop_cst, int &thread_num, int &CPU_Gen_Num, int &GPU_Gen_Num) {
@@ -423,9 +327,8 @@ void set_info (int &algo, int &hop_cst, int &thread_num, int &CPU_Gen_Num, int &
     info_cpu.use_GPU_version_generation = 0;
     info_cpu.use_GPU_version_generation_optimized = 0;
 	info_cpu.use_canonical_repair = 0;
-	info_cpu.max_run_time_seconds = 10000;
-    info_cpu.thread_num = 50;
-    printf("Init CPU_Info Successful!\n");
+    info_cpu.thread_num = thread_num;
+    printf("init CPU_info successful.\n");
 
     // gpu info
     info_gpu = new hop_constrained_case_info_v2();
@@ -433,7 +336,7 @@ void set_info (int &algo, int &hop_cst, int &thread_num, int &CPU_Gen_Num, int &
     info_gpu->thread_num = thread_num;
     info_gpu->use_2023WWW_GPU_version = 0;
     info_gpu->use_new_algo = 0;
-    printf("Init GPU_Info Successful!\n");
+    printf("init GPU_info successful.\n");
     
     // set algo type
     printf("algo: %d\n", algo);
@@ -508,16 +411,15 @@ int main (int argc, char** argv) {
     // data_path = "/home/mdnd/dataset/data_exp_web-Google/web-Google/web-Google.e";
     // data_path = "/home/mdnd/dataset/data_exp_DBLP/DBLP/DBLP.e";
     // data_path = "/home/mdnd/dataset/data_exp_com-youtube/com-youtube/com-youtube.e";
-    // data_path = "/home/mdnd/dataset/data_exp_wiki-talk/wiki-talk/wiki-talk.e";
+    data_path = "/home/mdnd/dataset/data_exp_wiki-talk/wiki-talk/wiki-talk.e";
     // data_path = "/home/mdnd/dataset/data_exp_as-skitter/as-skitter/as-skitter.e";
-    data_path = "/home/mdnd/dataset/data_exp_reddit/reddit/reddit.e";
+    // data_path = "/home/mdnd/dataset/data_exp_reddit/reddit/reddit.e";
+
     // data_path = argv[1];
     // hop_cst = std::stoi(argv[2]);
     // out_put_path = argv[3];
     // G_max = std::stoi(argv[4]);
     // cpu_type = std::stoi(argv[5]);
-    
-    printf("test.cu !\n");
 
     read_query(data_path.substr(0, data_path.rfind(".e")) + "_queries.txt");
 

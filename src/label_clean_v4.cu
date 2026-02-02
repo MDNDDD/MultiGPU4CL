@@ -7,13 +7,12 @@
 #define THREADS_NUM_CLEAN 256
 #define CALC_BLOCKS_NUM_NO(ITEMS_PER_BLOCK, CALC_SIZE) ((CALC_SIZE - 1) / ITEMS_PER_BLOCK + 1)
 
-__forceinline__ __device__ long long change_label_ (long long x, int* source) {
+__forceinline__ __device__ long long change_label_ (const long long &x, int* source) {
     return get_label(source[get_to_vertex(x)], get_hub_vertex(x), get_hop(x), get_distance(x));
 }
 
-__forceinline__ __device__ long long hash_pos_clean (long long x) {
-    x = _get_label(get_hub_vertex(x), get_to_vertex(x), get_hop(x), get_distance(x));
-    return x % TABLE_SIZE_CLEAN;
+__forceinline__ __device__ long long hash_pos_clean (const long long &x) {
+    return _get_label(get_hub_vertex(x), get_to_vertex(x), get_hop(x), get_distance(x)) % TABLE_SIZE_CLEAN;
 }
 
 __forceinline__ __device__ void insert_has_clean (long long* has_clean, long long d_input) {
@@ -169,6 +168,7 @@ __global__ void update_L (long long *L, long long *L_start, long long *L_end, in
 
 void gpu_clean_v4 (CSR_graph<weight_type>& input_graph, long long L_clean_start, long long L_clean_end, 
         hop_constrained_case_info_v2 *info_gpu, long long &last_pos) {
+
     int hop_cst = info_gpu->hop_cst;
     long long *L = info_gpu->L_clean;
     long long *L_start = info_gpu->L_start;
