@@ -365,7 +365,7 @@ inline graph_v_of_v<int> example_graph () {
 __global__ void gpu_warmup_kernel(float* dummy, int iterations) {
     int idx = threadIdx.x + blockIdx.x * blockDim.x;
     float sum = 0.0f;
-    for (int i = 0; i < iterations; ++i) sum += sqrtf(float(idx) + 0.1f) * cosf(float(i) * 0.5f);
+    for (int i = 0; i < iterations; ++ i) sum += sqrtf(float(idx) + 0.1f) * cosf(float(i) * 0.5f);
     if (dummy) dummy[idx] = sum;
 }
 // GPU warm-up
@@ -408,10 +408,10 @@ int main (int argc, char** argv) {
     // data_path = "/home/mdnd/dataset/data_exp_amazon-meta/amazon-meta/amazon-meta.e";
     // data_path = "/home/mdnd/dataset/data_exp_amazon-meta2/amazon-meta2/amazon-meta2.e";
     // data_path = "/home/mdnd/dataset/data_exp_web-BerkStan/web-BerkStan/web-BerkStan.e";
-    // data_path = "/home/mdnd/dataset/data_exp_web-Google/web-Google/web-Google.e";
+    data_path = "/home/mdnd/dataset/data_exp_web-Google/web-Google/web-Google.e";
     // data_path = "/home/mdnd/dataset/data_exp_DBLP/DBLP/DBLP.e";
     // data_path = "/home/mdnd/dataset/data_exp_com-youtube/com-youtube/com-youtube.e";
-    data_path = "/home/mdnd/dataset/data_exp_wiki-talk/wiki-talk/wiki-talk.e";
+    // data_path = "/home/mdnd/dataset/data_exp_wiki-talk/wiki-talk/wiki-talk.e";
     // data_path = "/home/mdnd/dataset/data_exp_as-skitter/as-skitter/as-skitter.e";
     // data_path = "/home/mdnd/dataset/data_exp_reddit/reddit/reddit.e";
 
@@ -456,8 +456,8 @@ int main (int argc, char** argv) {
     
     priority_queue<Executive_Core> pq_gen; Executive_Core x;
     vector<long long> L_size_before(V, 0);
-    for (int i = 0; i < CPU_Gen_Num; ++i) pq_gen.push(Executive_Core(GPU_Gen_Num + i, 0, 0)); // id, time, cpu/gpu
-    for (int i = 0; i < GPU_Gen_Num; ++i) pq_gen.push(Executive_Core(i, 0, 1)); // id, time, cpu/gpu
+    for (int i = 0; i < CPU_Gen_Num; ++ i) pq_gen.push(Executive_Core(GPU_Gen_Num + i, 0, 0)); // id, time, cpu/gpu
+    for (int i = 0; i < GPU_Gen_Num; ++ i) pq_gen.push(Executive_Core(i, 0, 1)); // id, time, cpu/gpu
     gpu_warmup ();
     for (int i = 0; i < Distributed_Graph_Num; ++ i, delta_L = 0) {
         x = pq_gen.top();
@@ -468,7 +468,7 @@ int main (int argc, char** argv) {
         } else { // core type is gpu
             label_gen_v4(csr_graph, info_gpu, L + delta_L, delta_L, graph_pool.graph_group[i], i, sort_time_record);
             // label_gen_v3(csr_graph, info_gpu, L + L_size, L_size, graph_pool.graph_group[i], i, sort_time_record);
-            for (long long j = 0; j < delta_L; j ++) {
+            for (long long j = 0; j < delta_L; ++ j) {
                 long long T = L[j];
                 int to_v = get_to_vertex(T);
                 L_hybrid[csr_graph.ARRAY_source[to_v]].push_back({
@@ -526,8 +526,8 @@ int main (int argc, char** argv) {
 
     priority_queue<Executive_Core> pq_clean;
     long long clean_size = 2000, last_pos = 1;
-    for (int i = 0; i < CPU_Clean_Num; ++i) pq_clean.push(Executive_Core(GPU_Gen_Num + i, 0, 0)); // id, time, cpu/gpu
-    for (int i = 0; i < GPU_Clean_Num; ++i) pq_clean.push(Executive_Core(i, 0, 1)); // id, time, cpu/gpu
+    for (int i = 0; i < CPU_Clean_Num; ++ i) pq_clean.push(Executive_Core(GPU_Gen_Num + i, 0, 0)); // id, time, cpu/gpu
+    for (int i = 0; i < GPU_Clean_Num; ++ i) pq_clean.push(Executive_Core(i, 0, 1)); // id, time, cpu/gpu
     gpu_warmup ();
     for (long long i = 0; i < V; i += clean_size) {
         x = pq_clean.top();
