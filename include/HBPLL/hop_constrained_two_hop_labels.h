@@ -3,7 +3,7 @@
 #pragma once
 
 #include <bits/stdc++.h>
-#include "definition/hub_def.h"
+#include <definition/hub_def.h>
 #include <label/hop_constrained_two_hop_labels_v2.cuh>
 #include <graph_v_of_v/graph_v_of_v.h>
 

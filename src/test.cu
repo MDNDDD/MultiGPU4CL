@@ -75,7 +75,7 @@ inline void read_query (string query_path) {
     infile.close();
 }
 
-inline void GPU_HSDL_checker (vector<vector<hub_type_v2> >&LL, graph_v_of_v<int> &instance_graph,
+inline void HybridHopHL_checker (vector<vector<hub_type_v2> >&LL, graph_v_of_v<int> &instance_graph,
                         int iteration_source_times, int iteration_terminal_times, int hop_bounded, int check_path) {
 
     boost::random::uniform_int_distribution<> vertex_range{ static_cast<int>(0), static_cast<int>(instance_graph.size() - 1) };
@@ -173,7 +173,7 @@ inline void GPU_HSDL_checker (vector<vector<hub_type_v2> >&LL, graph_v_of_v<int>
 
 double time_query_dis_total = 0.0, time_query_path_total = 0.0;
 double time_hop_dijkstra_query_dis_total = 0.0, time_hop_dijkstra_query_path_total = 0.0;
-inline void GPU_HSDL_checker_query_file (vector<vector<hub_type_v2> >&LL, graph_v_of_v<int> &instance_graph,
+inline void HybridHopHL_checker_query_file (vector<vector<hub_type_v2> >&LL, graph_v_of_v<int> &instance_graph,
                         int iteration_source_times, int iteration_terminal_times, int hop_bounded, int check_path) {
     printf("checker start query file.\n");
     
@@ -426,7 +426,6 @@ int main (int argc, char** argv) {
 
     read_query(data_path.substr(0, data_path.rfind(".e")) + "_queries.txt");
 
-
     // instance_graph = graph_v_of_v_generate_random_graph<int> (V, E, 1, 100, 1, boost_random_time_seed);
     // instance_graph.txt_save("../data/simple_iterative_tests.txt");
     // instance_graph = example_graph();
@@ -509,14 +508,14 @@ int main (int argc, char** argv) {
 
     // sort
     if (check_correctness) {
-        #pragma omp parallel for schedule(dynamic)
+        #pragma omp parallel for schedule(dynamic, 64)
         for (int v_k = 0; v_k < V; ++ v_k) {
             sort(L_hybrid[v_k].begin(), L_hybrid[v_k].end(), compare_hop_constrained_two_hop_label);
         }
     }
     printf("finish sort label.\n");
 
-    // clean_L
+    // init clean
     size_t free_byte, total_byte;
     if (GPU_Gen_Num) {
         info_gpu->destroy_L_cuda();
@@ -525,8 +524,10 @@ int main (int argc, char** argv) {
     cudaMemGetInfo(&free_byte, &total_byte);
     printf("Device memory after: total %ld, free %ld\n", total_byte, free_byte);
     info_gpu->init_clean(V, L_hybrid, csr_graph, label_before_clean, edge_id);
-    L_hybrid.resize(V);
+    // L_hybrid.resize(V);
+    printf("finish init clean.\n");
 
+    // clean L
     priority_queue<Executive_Core> pq_clean;
     long long clean_size = 2000, last_pos = 1;
     for (int i = 0; i < CPU_Clean_Num; ++ i) pq_clean.push(Executive_Core(GPU_Gen_Num + i, 0, 0)); // id, time, cpu/gpu
@@ -589,7 +590,7 @@ int main (int argc, char** argv) {
 
     if (check_correctness) {
         printf("check union correctness.\n");
-        GPU_HSDL_checker_query_file(L_hybrid, instance_graph, iteration_source_times, iteration_terminal_times, hop_cst, check_path);
+        HybridHopHL_checker_query_file(L_hybrid, instance_graph, iteration_source_times, iteration_terminal_times, hop_cst, check_path);
     }
 
     std::ofstream out(out_put_path, std::ios::app);

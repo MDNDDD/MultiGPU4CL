@@ -2,13 +2,13 @@
 #define CUDA_VECTOR_V2_CUH
 #pragma once
 
-#include "memoryManagement/mmpool.cuh"
-#include "memoryManagement/mmpool_v2.cuh"
+#include <memoryManagement/mmpool.cuh>
+#include <memoryManagement/mmpool_v2.cuh>
 #include <cassert>
 #include <cstddef>
 #include <cuda_runtime.h>
-#include "definition/hub_def.h"
-#include "label/hop_constrained_two_hop_labels_v2.cuh"
+#include <definition/hub_def.h>
+#include <label/hop_constrained_two_hop_labels_v2.cuh>
 #include <iostream>
 
 //#define data_type hop_constrained_two_hop_label

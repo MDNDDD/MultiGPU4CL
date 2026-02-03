@@ -2,7 +2,7 @@
 #define MMPOOL_V2_CUH
 #pragma once
 
-#include "definition/mmpool_size.h"
+#include <definition/mmpool_size.h>
 #include <cuda_runtime.h>
 #include <iostream>
 #include <mutex>

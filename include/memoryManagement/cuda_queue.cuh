@@ -2,10 +2,10 @@
 #define CUDA_QUEUE_CUH
 #pragma once
 
-#include "definition/hub_def.h"
-#include "definition/mmpool_size.h"
-#include "memoryManagement/cuda_vector.cuh"
-#include "memoryManagement/mmpool.cuh"
+#include <definition/hub_def.h>
+#include <definition/mmpool_size.h>
+#include <memoryManagement/cuda_vector.cuh>
+#include <memoryManagement/mmpool.cuh>
 #include <cassert>
 #include <cstddef>
 #include <cuda_runtime.h>
