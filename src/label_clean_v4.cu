@@ -12,7 +12,7 @@ __forceinline__ __device__ long long change_label_ (const long long &x, int* sou
 }
 
 __forceinline__ __device__ long long hash_pos_clean (const long long &x) {
-    return _get_label(get_hub_vertex(x), get_to_vertex(x), get_hop(x), get_distance(x)) % TABLE_SIZE_CLEAN;
+    return get_label(get_hub_vertex(x), get_to_vertex(x), get_hop(x), get_distance(x)) % TABLE_SIZE_CLEAN;
 }
 
 __forceinline__ __device__ void insert_has_clean (long long* has_clean, long long d_input) {

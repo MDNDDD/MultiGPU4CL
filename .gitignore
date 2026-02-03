@@ -3,6 +3,7 @@
 *.json
 
 build/
+.vscode/
 
 run_10w.sh
 run_100w.sh

@@ -2,7 +2,7 @@
 #define HOP_CONSTRAINED_TWO_HOP_LABELS_V2_H
 #pragma once
 
-#include "definition/hub_def.h"
+#include <definition/hub_def.h>
 
 #include <cuda_runtime.h>
 #include <fstream>

@@ -7,6 +7,7 @@
 #include <vector>
 #include <graph/ldbc.hpp>
 #include <graph_v_of_v/graph_v_of_v.h>
+#include <definition/pair_hash.hpp>
 
 /* for GPU */
 template <typename weight_type>
@@ -36,7 +37,7 @@ public:
 };
 
 template <typename weight_type>
-CSR_graph<weight_type> toCSR(LDBC<weight_type> &graph, std::map<std::pair<int, int>, int > *edge_id = nullptr) {
+CSR_graph<weight_type> toCSR(LDBC<weight_type> &graph, std::unordered_map<std::pair<int, int>, int, PairHash> *edge_id = nullptr) {
     CSR_graph<weight_type> ARRAY;
 
     int V = graph.size();

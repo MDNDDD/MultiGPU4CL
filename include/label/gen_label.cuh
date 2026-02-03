@@ -6,9 +6,9 @@
 #include <HBPLL/hop_constrained_two_hop_labels.h>
 #include <label/global_labels_v2.cuh>
 // #include "memoryManagement/cuda_hash.cuh"
-#include "memoryManagement/cuda_hashtable_v2.cuh"
-#include "memoryManagement/cuda_vector_v2.cuh"
-#include "memoryManagement/mmpool_v2.cuh"
+#include <memoryManagement/cuda_hashtable_v2.cuh>
+#include <memoryManagement/cuda_vector_v2.cuh>
+#include <memoryManagement/mmpool_v2.cuh>
 // #include "test/test_mmpool.cuh"
 #include <text_mining/ThreadPool.h>
 

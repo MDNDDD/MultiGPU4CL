@@ -1,5 +1,5 @@
-#include "label/gen_label.cuh"
-#include "cub/cub.cuh"
+#include <label/gen_label.cuh>
+#include <cub/cub.cuh>
 #include <cuda_runtime.h>
 #include <nvml.h>
 #include <atomic>

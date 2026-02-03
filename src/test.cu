@@ -3,6 +3,8 @@
 #include <boost/signals2/signal.hpp>
 #include <iomanip>
 
+#include <definition/pair_hash.hpp>
+
 #include <label/gen_label.cuh>
 #include <label/global_labels_v2.cuh>
 
@@ -31,7 +33,8 @@ hop_constrained_case_info_v2 *info_gpu;
 graph_v_of_v<int> instance_graph;
 CSR_graph<weight_type> csr_graph;
 Graph_pool<int> graph_pool;
-std::map<std::pair<int, int>, int> edge_id;
+
+std::unordered_map<std::pair<int, int>, int, PairHash> edge_id;
 
 struct Executive_Core {
     int id = 0;
@@ -511,7 +514,7 @@ int main (int argc, char** argv) {
             sort(L_hybrid[v_k].begin(), L_hybrid[v_k].end(), compare_hop_constrained_two_hop_label);
         }
     }
-    printf("Finish sort label!!!\n");
+    printf("finish sort label.\n");
 
     // clean_L
     size_t free_byte, total_byte;
