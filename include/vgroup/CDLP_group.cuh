@@ -18,53 +18,36 @@ struct group_union_unit {
 std::set<group_union_unit> se;
 
 static void generate_Group_CDLP(graph_v_of_v<weight_type> &instance_graph, std::vector<std::vector<int>> &groups, int MAX_GROUP_SIZE) {
-    printf("debug CDLP !!! \n");
-    auto start = std::chrono::high_resolution_clock::now();
-    // 将图转换为 CSR 格式
+    
     CSR_graph<weight_type> csr = graph_v_of_v_to_CSR<weight_type>(instance_graph);
-    auto end = std::chrono::high_resolution_clock::now();
-    std::chrono::duration<double> duration = end - start;
-    std::cout << "transform graph took " << duration.count() << " seconds." << std::endl;
-
-    // 初始化标签向量
     std::vector<int> labels(instance_graph.size(), 0);
 
-    // 执行 CDLP 算法
-    start = std::chrono::high_resolution_clock::now();
+    auto begin = std::chrono::high_resolution_clock::now();
     CDLP_GPU(instance_graph.size(), csr, labels, MAX_GROUP_SIZE, 1000);
-    end = std::chrono::high_resolution_clock::now();
-    duration = end - start;
-    std::cout << "CDLP took " << duration.count() << " seconds." << std::endl;
+    auto end = std::chrono::high_resolution_clock::now();
+    auto duration = std::chrono::duration_cast<std::chrono::nanoseconds>(end - begin).count() / 1e9;
+    printf("CDLP took: %.8lfs.\n", duration);
 
     std::vector<std::vector<int>> groups_after;
 
     // 确保 groups 的大小足够
     groups.resize(*max_element(labels.begin(), labels.end()) + 1);
 
-    start = std::chrono::high_resolution_clock::now();
+    begin = std::chrono::high_resolution_clock::now();
     // 根据标签将节点分组
     for (int node_id = 0; node_id < labels.size(); node_id++) {
         groups[labels[node_id]].push_back(node_id);
     }
-    //去除大小为 0 的 group
     groups.erase(std::remove_if(groups.begin(), groups.end(), [](const std::vector<int>& group) { return group.size() == 0; }), groups.end());
     
-    // for (int group_id = 0; group_id < groups.size(); group_id++) {
-    //     printf("groups size : %d\n", groups[group_id].size());
-    //     se.insert((group_union_unit){group_id, groups[group_id].size(), groups[group_id]});
-    // }
-
     for (int group_id = 0; group_id < groups.size(); group_id++) {
-        if (groups[group_id].size() > MAX_GROUP_SIZE / 2) {
-            printf("groups size : %d\n", groups[group_id].size());
-        }
         se.insert((group_union_unit){group_id, groups[group_id].size(), groups[group_id]});
     }
 
     // merge the small subsets
     std::set<group_union_unit>::iterator it1 = se.end(), it2;
-    it1--;
-    printf("max groups size: %d\n", (*it1).group_size);
+    it1 --;
+    // printf("max groups size: %d\n", (*it1).group_size);
     
     while (!se.empty()) {
         it1 = --se.end();
@@ -87,9 +70,9 @@ static void generate_Group_CDLP(graph_v_of_v<weight_type> &instance_graph, std::
     
     // sort as rank
     std::vector<group_union_unit> group_sort;
-    for (int group_id = 0; group_id < groups_after.size(); ++group_id) {
+    for (int group_id = 0; group_id < groups_after.size(); ++ group_id) {
         long long tot_degree = 0;
-        for (int j = 0; j < groups_after[group_id].size(); ++j) {
+        for (int j = 0; j < groups_after[group_id].size(); ++ j) {
             tot_degree -= instance_graph[groups_after[group_id][j]].size();
         }
         group_sort.push_back((group_union_unit){group_id, tot_degree, groups_after[group_id]});
@@ -97,22 +80,15 @@ static void generate_Group_CDLP(graph_v_of_v<weight_type> &instance_graph, std::
     sort(group_sort.begin(), group_sort.end());
 
     groups.resize(group_sort.size());
-    for (int group_id = 0; group_id < groups_after.size(); ++group_id) {
+    for (int group_id = 0; group_id < groups_after.size(); ++ group_id) {
         groups[group_id] = group_sort[group_id].group_node;
+        // if (groups[group_id].size() > MAX_GROUP_SIZE) {
+        //     printf("> MAX_GROUP_SIZE !!!!\n");
+        // }
     }
-    // groups = groups_after;
-    int group_tot_node = 0;
-    for (int group_id = 0; group_id < groups.size(); group_id++) {
-        // printf("groups after size : %d\n", groups[group_id].size());
-        if (groups[group_id].size() > MAX_GROUP_SIZE) {
-            printf("> MAX_GROUP_SIZE !!!!\n");
-        }
-        group_tot_node += groups[group_id].size();
-    }
-    printf("group_tot_node: %d\n", group_tot_node);
-    
     end = std::chrono::high_resolution_clock::now();
-    duration = end - start;
-    std::cout << "gen groups took " << duration.count() << " seconds." << std::endl;
+    duration = std::chrono::duration_cast<std::chrono::nanoseconds>(end - begin).count() / 1e9;
+    printf("generate groups took: %.8lfs.\n", duration);
 
+    return;
 }

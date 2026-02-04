@@ -411,12 +411,12 @@ int main (int argc, char** argv) {
     // data_path = "/home/mdnd/dataset/data_exp_amazon-meta/amazon-meta/amazon-meta.e";
     // data_path = "/home/mdnd/dataset/data_exp_amazon-meta2/amazon-meta2/amazon-meta2.e";
     // data_path = "/home/mdnd/dataset/data_exp_web-BerkStan/web-BerkStan/web-BerkStan.e";
-    data_path = "/home/mdnd/dataset/data_exp_web-Google/web-Google/web-Google.e";
+    // data_path = "/home/mdnd/dataset/data_exp_web-Google/web-Google/web-Google.e";
     // data_path = "/home/mdnd/dataset/data_exp_DBLP/DBLP/DBLP.e";
     // data_path = "/home/mdnd/dataset/data_exp_com-youtube/com-youtube/com-youtube.e";
     // data_path = "/home/mdnd/dataset/data_exp_wiki-talk/wiki-talk/wiki-talk.e";
     // data_path = "/home/mdnd/dataset/data_exp_as-skitter/as-skitter/as-skitter.e";
-    // data_path = "/home/mdnd/dataset/data_exp_reddit/reddit/reddit.e";
+    data_path = "/home/mdnd/dataset/data_exp_reddit/reddit/reddit.e";
 
     // data_path = argv[1];
     // hop_cst = std::stoi(argv[2]);
@@ -524,7 +524,7 @@ int main (int argc, char** argv) {
     cudaMemGetInfo(&free_byte, &total_byte);
     printf("Device memory after: total %ld, free %ld\n", total_byte, free_byte);
     info_gpu->init_clean(V, L_hybrid, csr_graph, label_before_clean, edge_id);
-    // L_hybrid.resize(V);
+    L_hybrid.resize(V);
     printf("finish init clean.\n");
 
     // clean L

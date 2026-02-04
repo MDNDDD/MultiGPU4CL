@@ -241,6 +241,20 @@
 #ifndef CDLPGPU
 #define CDLPGPU
 
+// === 必须放在所有 #include 之前 ===
+// #ifndef _CubLog
+// #define _CubLog(...) ((void)0)
+// #endif
+// #undef _CubLog
+// #define _CubLog(...) ((void)0)
+#define _CubLog(...)
+
+#define CUB_LOG 0
+#define CUB_DISABLE_LOGGING
+
+// 可选：显式关闭 CUB_LOG 级别
+#define CUB_LOG 0
+
 #include "cuda_runtime.h"
 #include <cuda_runtime_api.h>
 #include "device_launch_parameters.h"
@@ -476,7 +490,7 @@ void CDLP_GPU(int N, CSR_graph<int>& input_graph, std::vector<int>& res, int MAX
         cub::DeviceSegmentedSort::SortKeys(
             d_temp_storage, temp_storage_bytes, prop_labels, new_prop_labels,
             E, N, all_pointer, all_pointer + 1); // sort the labels of each vertex's neighbors
-        cudaDeviceSynchronize();
+        ::cudaDeviceSynchronize();
 
         cuda_status = cudaGetLastError(); // check for errors
         if (cuda_status != cudaSuccess) {

@@ -281,6 +281,7 @@
 #include <fstream>
 #include <sstream>
 #include <malloc.h>
+#include <omp.h>
 
 #define TABLE_SIZE_CLEAN 2999999929
 #define TABLE_SIZE_CLEAN_MINUS_ONE 2999999928
@@ -505,6 +506,7 @@ public:
             L_start[i + 1] = L_start[i] + res[i].size();
         }
         long long pos = L_start[V];
+
         #pragma omp parallel for schedule(dynamic, 64)
         for (int i = 0; i < V; ++ i) {
             long long base = L_start[i];
@@ -520,6 +522,13 @@ public:
                 }
             }
             L_end[i] = base + res[i].size();
+
+            if (i % 50000 == 0) {
+                #pragma omp critical
+                {
+                    std::cout << "processed i = " << i << " / " << V << std::endl;
+                }
+            }
         }
 
         // int device;
@@ -530,7 +539,7 @@ public:
         long long label_cnt = 0;
         for (int i = 0; i < V; ++ i) {
             label_cnt += res[i].size();
-            if (i % 5000 == 0) {
+            if (i % 50000 == 0) {
                 printf("count label: %d, %lld, %.6lf, %.6lf\n", i, res[i].size(), label_cnt / (double)pos, L_end[i] / (double)pos);
             } 
         }
