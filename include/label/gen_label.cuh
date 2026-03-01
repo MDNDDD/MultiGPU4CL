@@ -24,7 +24,7 @@ void label_gen_v3 (CSR_graph<weight_type>& input_graph, hop_constrained_case_inf
 
 // void label_gen_v3 (CSR_graph<weight_type>& input_graph, hop_constrained_case_info_v2 *info, std::vector<long long> &L, std::vector<std::vector<hub_type_v2> >&LL, std::vector<int>& nid_vec, int nid_vec_id);
 void label_gen_v4 (CSR_graph<weight_type>& input_graph, hop_constrained_case_info_v2 *info, long long *L, 
-        long long &L_size, std::vector<int>& nid_vec, int nid_vec_id, double &sort_time_record);
+        long long &L_size, std::vector<int>& nid_vec, int nid_vec_id, int check_wb, double &sort_time_record);
 
 __global__ void gen_label_hsdl (int V, int thread_num, int hop_cst, int hop_now, int* out_pointer, int* out_edge, int* out_edge_weight,
             cuda_vector_v2<long long> *L_gpu, cuda_hashTable_v2<short> *Has, cuda_vector_v2<T_item> *T0, cuda_vector_v2<T_item> *T1);

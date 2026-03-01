@@ -346,12 +346,21 @@ public:
     hop_constrained_case_info_v2() {}
 
     // Constructor
-    __host__ void init (int V, int hop_cst, int G_max, int thread_num, std::vector<std::vector<int> > graph_group) {
+    __host__ void init (int V, int hop_cst, int G_max, int thread_num, std::vector<std::vector<int> > graph_group, int check_flahash) {
         long long max_val[1] = {0x7FFFFFFFFFFFFFFFLL};
-        cudaMallocManaged(&has, (long long)TABLE_SIZE * sizeof(long long));
-        cudaMemset(has, 0ll, (long long)TABLE_SIZE * sizeof(long long));
-        cudaMallocManaged(&das, (long long)TABLE_SIZE * sizeof(long long));
-        cudaMemset(das, 0ll, (long long)TABLE_SIZE * sizeof(long long));
+
+        if (check_flahash) {
+            cudaMalloc(&has, (long long) G_max * V * (hop_cst + 1) * sizeof(int));
+            cudaMemset(has, 0ll, (long long) G_max * V * (hop_cst + 1) * sizeof(int));
+            cudaMalloc(&das, (long long) G_max * V * sizeof(int));
+            cudaMemset(das, 0ll, (long long) G_max * V * sizeof(int));
+        } else {
+            cudaMallocManaged(&has, (long long) TABLE_SIZE * sizeof(long long));
+            cudaMemset(has, 0ll, (long long) TABLE_SIZE * sizeof(long long));
+            cudaMallocManaged(&das, (long long) TABLE_SIZE * sizeof(long long));
+            cudaMemset(das, 0ll, (long long) TABLE_SIZE * sizeof(long long));
+        }
+
         cudaMallocManaged(&T_offset_begin, (hop_cst + 1) * (V + 1) * sizeof(long long));
         cudaMallocManaged(&T_offset_end, (hop_cst + 1) * (V + 1) * sizeof(long long));
         cudaDeviceSynchronize();

@@ -385,9 +385,10 @@ int main (int argc, char** argv) {
 
     srand(time(0));
     int iteration_source_times = 2000, iteration_terminal_times = 2000;
-    int V = 5000, E = 30000, hop_cst = 5, G_max = 300, Distributed_Graph_Num = 1, thread_num = 50;
+    int V = 5000, E = 30000, hop_cst = 5, G_max = 500, Distributed_Graph_Num = 1, thread_num = 50;
     int check_correctness = 1, check_path = 1, use_cd = 1, cpu_type = 0;
     int CPU_Gen_Num = 0, GPU_Gen_Num = 4, CPU_Clean_Num = 0, GPU_Clean_Num = 4;
+    int check_flacsr = 0, check_flahash = 0, check_wb = 0;
     string data_path, out_put_path;
 
     double time_cd_total = 0.0, sort_time_record = 0.0;
@@ -411,18 +412,21 @@ int main (int argc, char** argv) {
     // data_path = "/home/mdnd/dataset/data_exp_amazon-meta/amazon-meta/amazon-meta.e";
     // data_path = "/home/mdnd/dataset/data_exp_amazon-meta2/amazon-meta2/amazon-meta2.e";
     // data_path = "/home/mdnd/dataset/data_exp_web-BerkStan/web-BerkStan/web-BerkStan.e";
+
+    data_path = "/home/mdnd/dataset/data_exp_1w/as-caida20071105/as-caida20071105.e";
+    // data_path = "/home/mdnd/dataset/data_exp_1w/p2p-Gnutella31/p2p-Gnutella31.e";
     // data_path = "/home/mdnd/dataset/data_exp_web-Google/web-Google/web-Google.e";
     // data_path = "/home/mdnd/dataset/data_exp_DBLP/DBLP/DBLP.e";
     // data_path = "/home/mdnd/dataset/data_exp_com-youtube/com-youtube/com-youtube.e";
     // data_path = "/home/mdnd/dataset/data_exp_wiki-talk/wiki-talk/wiki-talk.e";
     // data_path = "/home/mdnd/dataset/data_exp_as-skitter/as-skitter/as-skitter.e";
-    data_path = "/home/mdnd/dataset/data_exp_reddit/reddit/reddit.e";
+    // data_path = "/home/mdnd/dataset/data_exp_reddit/reddit/reddit.e";
 
-    // data_path = argv[1];
-    // hop_cst = std::stoi(argv[2]);
-    // out_put_path = argv[3];
-    // G_max = std::stoi(argv[4]);
-    // cpu_type = std::stoi(argv[5]);
+    data_path = argv[1];
+    hop_cst = std::stoi(argv[2]);
+    out_put_path = argv[3];
+    G_max = std::stoi(argv[4]);
+    cpu_type = std::stoi(argv[5]);
 
     read_query(data_path.substr(0, data_path.rfind(".e")) + "_queries.txt");
 
@@ -442,7 +446,7 @@ int main (int argc, char** argv) {
     info_gpu = new hop_constrained_case_info_v2();
     info_gpu->hop_cst = hop_cst;
     info_gpu->set_nid(Distributed_Graph_Num, graph_pool.graph_group);
-    info_gpu->init(V, hop_cst, G_max, thread_num, graph_pool.graph_group);
+    info_gpu->init(V, hop_cst, G_max, thread_num, graph_pool.graph_group, check_flahash);
 
     info_cpu.upper_k = hop_cst;
     info_cpu.use_rank_prune = 1;
@@ -468,7 +472,7 @@ int main (int argc, char** argv) {
         if (x.core_type == 0) { // core type is cpu
             hop_constrained_two_hop_labels_generation(instance_graph, info_cpu, L_hybrid, graph_pool.graph_group[i]);
         } else { // core type is gpu
-            label_gen_v4(csr_graph, info_gpu, L + delta_L, delta_L, graph_pool.graph_group[i], i, sort_time_record);
+            label_gen_v4(csr_graph, info_gpu, L + delta_L, delta_L, graph_pool.graph_group[i], i, check_wb, sort_time_record);
             // label_gen_v3(csr_graph, info_gpu, L + L_size, L_size, graph_pool.graph_group[i], i, sort_time_record);
             for (long long j = 0; j < delta_L; ++ j) {
                 long long T = L[j];
@@ -530,7 +534,7 @@ int main (int argc, char** argv) {
     // clean L
     priority_queue<Executive_Core> pq_clean;
     long long clean_size = 2000, last_pos = 1;
-    for (int i = 0; i < CPU_Clean_Num; ++ i) pq_clean.push(Executive_Core(GPU_Gen_Num + i, 0, 0)); // id, time, cpu/gpu
+    for (int i = 0; i < CPU_Clean_Num; ++ i) pq_clean.push(Executive_Core(GPU_Clean_Num + i, 0, 0)); // id, time, cpu/gpu
     for (int i = 0; i < GPU_Clean_Num; ++ i) pq_clean.push(Executive_Core(i, 0, 1)); // id, time, cpu/gpu
     gpu_warmup ();
     for (long long i = 0; i < V; i += clean_size) {
@@ -594,11 +598,12 @@ int main (int argc, char** argv) {
     }
 
     std::ofstream out(out_put_path, std::ios::app);
-    out << fixed << setprecision(8) << data_path << ", " << hop_cst << ", " 
-    << time_generate_labels_total << ", " << label_before_clean << ", " 
-    << time_clean_labels_total << ", " << label_after_clean << std::endl
-    << fixed << setprecision(8) << "algo_query_time: " << time_query_dis_total << ", " << time_query_path_total << std::endl
-    << fixed << setprecision(8) << "hopdij_query_time: " << time_hop_dijkstra_query_dis_total << ", " << time_hop_dijkstra_query_path_total << std::endl;
+    out << fixed << setprecision(8) << data_path << std::endl
+    << "hop_cst: " << hop_cst << ", G_max: " << G_max << std::endl
+    << "gen_labels_time: " << time_generate_labels_total << ", gen_labels_total: " << label_before_clean << std::endl
+    << "clean_labels_time: " << time_clean_labels_total << ", clean_labels_total: " << label_after_clean << std::endl
+    << "algo_query_dis_time: " << time_query_dis_total << ", algo_query_path_time: " << time_query_path_total << std::endl
+    << "hopdij_query_dis_time: " << time_hop_dijkstra_query_dis_total << ", hopdij_query_path_time: " << time_hop_dijkstra_query_path_total << std::endl << std::endl;
     out.close();
 
     return 0;

@@ -13,180 +13,14 @@
 // #define CALC_BLOCKS_NUM_LL(ITEMS_PER_BLOCK, CALC_SIZE) min((long long)MAX_BLOCKS_NUM, (CALC_SIZE - 1) / ITEMS_PER_BLOCK + 1)
 // #define CALC_BLOCKS_NUM_NOLIMIT(ITEMS_PER_BLOCK, CALC_SIZE) ((CALC_SIZE - 1) / ITEMS_PER_BLOCK + 1)
 
-// __forceinline__ __device__ int hash_pos (const long long &x) {
-//     return x % TABLE_SIZE;
+// int VV = 0;
+// __forceinline__ __device__ void mod_hash (int *has, int *nid, int *vid, int hub, int tar, int hop, int hop_cst, int value) {
+//     long long index1 = (long long) hub * VV * (hop_cst + 1);
+//     has[index1 + VV * (hop_cst + 1) + hop] = value;
 // }
-// __forceinline__ __device__ int hash_pos_2 (const long long &x) {
-//     return x % MOD;
-// }
-// __forceinline__ __device__ int hash_52_to_30(const uint64_t &input) {
-//     // input *= (input >> 24);
-//     // input *= 0x9E3779B97F4A7C15ULL;
-//     // input ^= input << 30;
-//     // input *= 0xbf58476d1ce4e5b9LL;
-//     // input ^= input >> 27;
-//     // input *= 0x94d049bb133111ebLL;
-//     // input ^= input << 31;
-//     // return (input >> 22) & 0x3FFFFFFF;
-//     return input % TABLE_SIZE;
-// }
-// __forceinline__ __device__ int hash_52_to_22(const uint64_t &input) {
-//     // input *= (input >> 24);
-//     // input *= 0xc6a4b3b5d82bc2c9ULL;
-//     // input ^= (input >> 3) * 0x1B873593;  // 右移29位，乘以质数0x1B873593
-//     // input ^= (input << 17) * 0x4C190623;  // 左移17位，乘以质数0x4C190623
-//     // input ^= (input >> 32) * 0x82E7E515;  // 右移32位，乘以质数0x82E7E515
-//     // input ^= (input << 11) * 0x5BD1E995;  // 左移11位，乘以质数0x5BD1E995
-//     // return (input >> 25) & 0x003FFFFF;
-//     return input % MOD;
-// }
-
-// __forceinline__ __device__ void insertKernel_has (long long* d_table, long long d_input) {
-//     long long pos = hash_pos(d_input & (~0ull << 10));
-//     long long old;
-//     while (true) {
-//         old = d_table[pos];
-//         if (old == 0) {
-//             long long expected = 0;
-//             if (atomicCAS((unsigned long long*)&d_table[pos], *(unsigned long long*)&expected, *(unsigned long long*)&d_input) == *(unsigned long long*)&expected) {
-//                 break;
-//             }
-//         } else {
-//             if ((old >> 10) == (d_input >> 10)) {
-//                 d_table[pos] = d_input;
-//                 return;
-//             }
-//             pos = (pos == TABLE_SIZE_MINUS_ONE) ? 0 : pos + 1;
-//         }
-//     }
-// }
-
-// __forceinline__ __device__ long long change_label(const long long &x, int *source) {
-//     return get_label(source[get_to_vertex(x)], get_hub_vertex(x), get_hop(x), get_distance(x));
-// }
-
-// __forceinline__ __device__ bool insertKernel_das (long long *d_table, int *source, long long d_input) {
-//     long long pos = hash_pos(change_label(d_input, source) & (~0ull << 10));
-//     long long old;
-//     while (true) {
-//         old = d_table[pos];
-//         if (old == 0) {
-//             long long expected = 0;
-//             if (atomicCAS((unsigned long long*)&d_table[pos], *(unsigned long long*)&expected, *(unsigned long long*)&d_input) == *(unsigned long long*)&expected) {
-//                 return 1;
-//             }
-//         } else {
-//             if ((change_label(old, source) >> 10) == (change_label(d_input, source) >> 10)) {
-//                 while (1) {
-//                     old = d_table[pos];
-//                     long long old_low10 = old & 0x3FF;  // 0x3FF = (1 << 10) - 1
-//                     long long input_low10  = d_input & 0x3FF;
-//                     if (input_low10 < old_low10) {
-//                         atomicCAS((unsigned long long*)&d_table[pos], old, d_input);
-//                         if (d_table[pos] == d_input) {
-//                             return 0;
-//                         }
-//                     } else {
-//                         return 0;
-//                     }
-//                 }
-//                 // long long old_low10 = old & 0x3FF;  // 0x3FF = (1 << 10) - 1
-//                 // long long input_low10  = d_input & 0x3FF;
-//                 // if (input_low10 < old_low10) {
-//                 //     atomicCAS((unsigned long long*)&d_table[pos], old, d_input);
-//                 // }
-//                 // return 0;
-//             }
-//             pos = (pos == TABLE_SIZE_MINUS_ONE) ? 0 : pos + 1;
-//         }
-//     }
-// }
-
-// __global__ void clearKernel_das (long long *d_table, long long *d_input, int *source, int inputSize) {
-//     long long idx = threadIdx.x + blockIdx.x * blockDim.x;
-//     if (idx >= inputSize) return;
-
-//     long long old;
-//     long long d_input_change = change_label(d_input[idx], source);
-//     long long pos = hash_pos(d_input_change & (~0ull << 10));
-//     while (true) {
-//         old = d_table[pos];
-//         if ((change_label(old, source) >> 10) == (change_label(d_input[idx], source) >> 10)) {
-//             d_table[pos] = 0;
-//             d_input[idx] = old;
-//             return;
-//         }
-//         pos = (pos == TABLE_SIZE_MINUS_ONE) ? 0 : pos + 1;
-//     }
-// }
-
-// __global__ void clearKernel_has (long long *d_table, long long* d_input, int *source, int inputSize, int hop_cst) {
-//     long long idx = threadIdx.x + blockIdx.x * blockDim.x;
-//     if (idx >= inputSize) return;
-    
-//     long long item = d_input[idx];
-//     item = change_label(item, source);
-//     int hop = get_hop(item);
-//     for (int i = hop; i <= hop_cst; i ++) {
-//         long long pos = hash_pos(item & (~0ull << 10));
-//         while (true) {
-//             if (d_table[pos]) {
-//                 d_table[pos] = 0;
-//                 pos = (pos == TABLE_SIZE_MINUS_ONE) ? 0 : pos + 1;
-//             } else {
-//                 break;
-//             }
-//         }
-//         item += (1 << 10);
-//     }
-// }
-
-// __forceinline__ __device__ int queryKernel_single (long long *d_table, long long d_input) {
-//     long long pos = hash_pos(d_input & (~0ull << 10));
-//     long long old;
-//     int x = 0;
-//     while (true) {
-//         old = d_table[pos];
-//         if (old == 0) return 1e5;
-//         if ((old >> 10) == (d_input >> 10)) {
-//             return (int)((old) & 0x3FF);
-//         }
-//         pos = (pos == TABLE_SIZE_MINUS_ONE) ? 0 : pos + 1;
-//     }
-// }
-
-// template<int THREADS_NUM>
-// __global__ void HSDL_gather_kernel_naive (long long *T_pre, unsigned long long *T_pre_offset, long long *T_after, unsigned long long *T_after_offset,
-//     long long *das, int *out_edge, int *out_edge_weight, int *out_pointer, int *inv, int *source, int hop) {
-    
-//     int idx = blockIdx.x * blockDim.x + threadIdx.x;
-//     unsigned long long total_vertices = T_pre_offset[0];
-
-//     for (int i = idx; i < total_vertices; i += blockDim.x * gridDim.x) {
-        
-//         long long node = T_pre[i];
-        
-//         int src = source[get_to_vertex(node)];
-//         int hub_vertex = get_hub_vertex(node);
-//         int current_dist = get_distance(node);
-//         int row_begin = out_pointer[src], row_end = out_pointer[src + 1];
-
-//         for (int gather = row_begin; gather < row_end; ++ gather) {
-            
-//             // 计算邻居的新 label
-//             long long neighbour = get_label(inv[gather], hub_vertex, hop, current_dist + out_edge_weight[gather]);
-
-//             // 5. 条件判定与插入
-//             // 只有满足特定条件且成功插入 das 集合时，才将其放入下一轮 Frontier
-//             if (hub_vertex < out_edge[gather] && insertKernel_das(das, source, neighbour)) {
-                
-//                 // 6. 使用原子操作竞争输出位置
-//                 // 原代码复杂的 BlockScan 最终目的就是为了算出这个 offset
-//                 unsigned long long output_pos = atomicAdd(T_after_offset, 1ULL);
-//                 T_after[output_pos] = neighbour;
-//             }
-//         }
-//     }
+// __forceinline__ __device__ int get_hash (int *has, int *nid, int *vid, int hub, int tar, int hop, int hop_cst) {
+//     long long index1 = (long long) nid[hub] * VV * (hop_cst + 1);
+//     return has[index1 + VV * (hop_cst + 1) + hop];
 // }
 
 // template<int THREADS_NUM>
@@ -464,7 +298,7 @@
 //     }
 // }
 
-// __global__ void init_T (int group_size, long long *T, long long *has, int *nid, long long *T_offset_begin, long long *T_offset_end, 
+// __global__ void init_T (int group_size, long long *T, long long *has, int *nid, int *vid, long long *T_offset_begin, long long *T_offset_end, 
 //     int *out_edge, int *out_edge_weight, int *out_pointer, int hop_cst) {
 //     long long tid = blockIdx.x * blockDim.x + threadIdx.x;
 //     if (tid >= group_size) return;
@@ -473,7 +307,9 @@
 //     // T[tid] = get_label(v, v, 0, 0);
 //     long long TT = get_label(v, v, 0, 0); // to, hub, hop, dis
 //     for (int i = 0; i <= hop_cst; i ++) {
-//         insertKernel_has (has, TT);
+//         // insertKernel_has (has, TT);
+//         mod_hash (has, nid, vid, v, v, 0, hop_cst, 0);
+//         // mod_hash (int *has, int hub, int tar, int hop, int hop_cst, int value)
 //         TT += (1 << 10);
 //     }
 //     T[tid] = get_label(out_pointer[v], v, 0, 0);
@@ -504,6 +340,7 @@
 //     constexpr int THREADS_NUM = 256;
 //     long long V = input_graph.OUTs_Neighbor_start_pointers.size() - 1;
 //     long long E = input_graph.OUTs_Edges.size();
+//     VV = V;
 
 //     // out_edge, out_edge_weight, out_pointer
 //     int* out_edge = input_graph.out_edge;
@@ -515,6 +352,13 @@
 //     long long hop_cst = info->hop_cst;
 //     long long group_size = info->nid_size[nid_vec_id];
 //     int* nid = info->nid[nid_vec_id];
+//     int* vid;
+//     cudaMallocManaged(&vid, V * sizeof(int));
+//     cudaDeviceSynchronize();
+//     for (int i = 0; i < group_size; i ++) {
+//         vid[nid[i]] = i;
+//     }
+    
 //     long long* T = info->T;
 //     long long* H = info->has;
 //     long long* D = info->das;
@@ -539,7 +383,7 @@
 //     CHECK_CUDA_KERNEL();
     
 //     BLOCKS_NUM = CALC_BLOCKS_NUM_NOLIMIT(THREADS_NUM, group_size);
-//     init_T<<<BLOCKS_NUM, THREADS_NUM>>>(group_size, T + last_pos, H, nid, T_offset_begin, T_offset_end, out_edge, out_edge_weight, out_pointer, hop_cst);
+//     init_T<<<BLOCKS_NUM, THREADS_NUM>>>(group_size, T + last_pos, H, nid, vid, T_offset_begin, T_offset_end, out_edge, out_edge_weight, out_pointer, hop_cst);
 //     cudaDeviceSynchronize();
 //     CHECK_CUDA_KERNEL();
     
@@ -557,15 +401,12 @@
 
 //         // cudaMemcpy(L + last_pos - 1, T + last_pos, last_size[0] * sizeof(long long), cudaMemcpyDeviceToHost);
 //         // printf("size: %llu\n", last_size[0]);
-//         if (check_wb) {
-//             HSDL_gather_kernel_naive<THREADS_NUM> <<<BLOCKS_NUM, THREADS_NUM>>>(T + last_pos, T_pre_offset, T + last_pos + last_size[0], 
-//                 T_after_offset, D, out_edge, out_edge_weight, out_pointer, inv, source, hop);
-//             cudaDeviceSynchronize();
-//         } else {
-//             HSDL_gather_kernel<THREADS_NUM> <<<BLOCKS_NUM, THREADS_NUM>>>(T + last_pos, T_pre_offset, T + last_pos + last_size[0], 
-//                 T_after_offset, D, out_edge, out_edge_weight, out_pointer, inv, source, hop);
-//             cudaDeviceSynchronize();
-//         }
+//         HSDL_gather_kernel<THREADS_NUM> <<<BLOCKS_NUM, THREADS_NUM>>>(T + last_pos, T_pre_offset, T + last_pos + last_size[0], 
+//             T_after_offset, D, out_edge, out_edge_weight, out_pointer, inv, source, hop);
+//         cudaDeviceSynchronize();
+//         // HSDL_gather_kernel_naive<THREADS_NUM> <<<BLOCKS_NUM, THREADS_NUM>>>(T + last_pos, T_pre_offset, T + last_pos + last_size[0], 
+//         //     T_after_offset, D, out_edge, out_edge_weight, out_pointer, inv, source, hop);
+//         // cudaDeviceSynchronize();
 //         CHECK_CUDA_KERNEL();
         
 //         last_pos += last_size[0];
