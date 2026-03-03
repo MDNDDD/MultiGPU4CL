@@ -351,9 +351,9 @@ public:
 
         if (check_flahash) {
             cudaMalloc(&has, (long long) G_max * V * (hop_cst + 1) * sizeof(int));
-            cudaMemset(has, 0ll, (long long) G_max * V * (hop_cst + 1) * sizeof(int));
-            cudaMalloc(&das, (long long) G_max * V * sizeof(int));
-            cudaMemset(das, 0ll, (long long) G_max * V * sizeof(int));
+            cudaMemset(has, 0x3F, (long long) G_max * V * (hop_cst + 1) * sizeof(int));
+            cudaMalloc(&das, (long long) G_max * V * 3 * sizeof(int));
+            cudaMemset(das, 0x3F, (long long) G_max * V * 3 * sizeof(int));
         } else {
             cudaMallocManaged(&has, (long long) TABLE_SIZE * sizeof(long long));
             cudaMemset(has, 0ll, (long long) TABLE_SIZE * sizeof(long long));
@@ -471,11 +471,16 @@ public:
 
     // init clean for memory
     __host__ void init_clean (int V, std::vector<std::vector<hop_constrained_two_hop_label>> &res, 
-        CSR_graph<weight_type> &csr_graph, long long L_size, std::unordered_map<std::pair<int, int>, int, PairHash> &edge_id) {
+        CSR_graph<weight_type> &csr_graph, long long L_size, std::unordered_map<std::pair<int, int>, int, PairHash> &edge_id, int G_max, int check_flahash) {
 
         last_size = 1;
-        cudaMallocManaged(&has_clean, (long long)TABLE_SIZE_CLEAN * sizeof(long long));
-        cudaMemset(has_clean, 0ll, (long long)TABLE_SIZE_CLEAN * sizeof(long long));
+        if (check_flahash) {
+            cudaMalloc(&has_clean, (long long) G_max * V * (hop_cst + 1) * sizeof(int));
+            cudaMemset(has_clean, 0x3F, (long long) G_max * V * (hop_cst + 1) * sizeof(int));        
+        } else {
+            cudaMallocManaged(&has_clean, (long long)TABLE_SIZE_CLEAN * sizeof(long long));
+            cudaMemset(has_clean, 0ll, (long long)TABLE_SIZE_CLEAN * sizeof(long long));
+        }
         cudaMallocManaged(&L_start, (long long)(V + 1) * sizeof(long long));
         cudaMallocManaged(&L_end, (long long)(V + 1) * sizeof(long long));
         cudaMallocManaged(&L_clean, (long long)(L_size + 1) * sizeof(long long));

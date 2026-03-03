@@ -30,13 +30,13 @@ data_dir['as-skitter']="/home/mdnd/dataset/data_exp_as-skitter/as-skitter"
 data_dir['reddit']="/home/mdnd/dataset/data_exp_reddit/reddit"
 echo ${data_dir[*]}
 
-output="/home/mdnd/HybridHopHL/exp_record/result_Hybrid_GPU_data_exp_no_csr.csv"
+output="/home/mdnd/HybridHopHL/exp_record/result_Hybrid_GPU_data_exp_cd.csv"
 gpu_id=0
 
-# gmax=(100, 500, 2000)
-gmax=(400)
+gmax=(100, 500, 2000)
+# gmax=(400)
 
-for data_set_name in $(seq 0 7); do
+for data_set_name in $(seq 0 4); do
     if [[ " ${!data_set[@]}" =~ "$data_set_name" ]]; then
         data_dir_1=${data_dir[${data_set[$data_set_name]}]}
         dataset_file="$data_dir_1/*.e"

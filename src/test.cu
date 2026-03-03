@@ -312,9 +312,13 @@ inline void sub_graph (int &use_cd, int &V, int &E, int &G_max, int &Distributed
         G_max = V / Distributed_Graph_Num + 1;
     } else if (use_cd == 1) {
         auto begin = std::chrono::high_resolution_clock::now();
-        generate_Group_CDLP(instance_graph, graph_pool.graph_group, G_max);
+        generate_Group_CDLP (instance_graph, graph_pool.graph_group, G_max);
         auto end = std::chrono::high_resolution_clock::now();
         time_cd_total = std::chrono::duration_cast<std::chrono::nanoseconds>(end - begin).count() / 1e9;
+        for (int i = 0; i < graph_pool.graph_group.size(); i ++) {
+            // printf("gmax %d, %d\n", i, graph_pool.graph_group[i].size());
+            G_max = std::max (G_max, (int) graph_pool.graph_group[i].size());
+        }
         Distributed_Graph_Num = graph_pool.graph_group.size();
     } else {
         Distributed_Graph_Num = 3;
@@ -388,7 +392,7 @@ int main (int argc, char** argv) {
     int V = 5000, E = 30000, hop_cst = 5, G_max = 500, Distributed_Graph_Num = 1, thread_num = 50;
     int check_correctness = 1, check_path = 1, use_cd = 1, cpu_type = 0;
     int CPU_Gen_Num = 0, GPU_Gen_Num = 4, CPU_Clean_Num = 0, GPU_Clean_Num = 4;
-    int check_flacsr = 0, check_flahash = 0, check_wb = 0;
+    int check_flacsr = 0, check_flahash = 1, check_wb = 0;
     string data_path, out_put_path;
 
     double time_cd_total = 0.0, sort_time_record = 0.0;
@@ -413,20 +417,22 @@ int main (int argc, char** argv) {
     // data_path = "/home/mdnd/dataset/data_exp_amazon-meta2/amazon-meta2/amazon-meta2.e";
     // data_path = "/home/mdnd/dataset/data_exp_web-BerkStan/web-BerkStan/web-BerkStan.e";
 
-    data_path = "/home/mdnd/dataset/data_exp_1w/as-caida20071105/as-caida20071105.e";
+    // data_path = "/home/mdnd/dataset/data_exp_1w/as-caida20071105/as-caida20071105.e";
     // data_path = "/home/mdnd/dataset/data_exp_1w/p2p-Gnutella31/p2p-Gnutella31.e";
     // data_path = "/home/mdnd/dataset/data_exp_web-Google/web-Google/web-Google.e";
     // data_path = "/home/mdnd/dataset/data_exp_DBLP/DBLP/DBLP.e";
-    // data_path = "/home/mdnd/dataset/data_exp_com-youtube/com-youtube/com-youtube.e";
+    data_path = "/home/mdnd/dataset/data_exp_com-youtube/com-youtube/com-youtube.e";
     // data_path = "/home/mdnd/dataset/data_exp_wiki-talk/wiki-talk/wiki-talk.e";
     // data_path = "/home/mdnd/dataset/data_exp_as-skitter/as-skitter/as-skitter.e";
     // data_path = "/home/mdnd/dataset/data_exp_reddit/reddit/reddit.e";
 
-    data_path = argv[1];
-    hop_cst = std::stoi(argv[2]);
-    out_put_path = argv[3];
-    G_max = std::stoi(argv[4]);
-    cpu_type = std::stoi(argv[5]);
+    out_put_path = "/home/mdnd/HybridHopHL/exp_record/result_Hybrid_GPU_data_test.csv";
+
+    // data_path = argv[1];
+    // hop_cst = std::stoi(argv[2]);
+    // out_put_path = argv[3];
+    // G_max = std::stoi(argv[4]);
+    // cpu_type = std::stoi(argv[5]);
 
     read_query(data_path.substr(0, data_path.rfind(".e")) + "_queries.txt");
 
@@ -527,13 +533,16 @@ int main (int argc, char** argv) {
     // csr_graph.destroy_csr_graph();
     cudaMemGetInfo(&free_byte, &total_byte);
     printf("Device memory after: total %ld, free %ld\n", total_byte, free_byte);
-    info_gpu->init_clean(V, L_hybrid, csr_graph, label_before_clean, edge_id);
+    info_gpu->init_clean(V, L_hybrid, csr_graph, label_before_clean, edge_id, G_max, check_flahash);
     L_hybrid.resize(V);
     printf("finish init clean.\n");
 
     // clean L
     priority_queue<Executive_Core> pq_clean;
     long long clean_size = 2000, last_pos = 1;
+    if (check_flahash) {
+        clean_size = G_max;
+    }
     for (int i = 0; i < CPU_Clean_Num; ++ i) pq_clean.push(Executive_Core(GPU_Clean_Num + i, 0, 0)); // id, time, cpu/gpu
     for (int i = 0; i < GPU_Clean_Num; ++ i) pq_clean.push(Executive_Core(i, 0, 1)); // id, time, cpu/gpu
     gpu_warmup ();
@@ -594,6 +603,7 @@ int main (int argc, char** argv) {
 
     if (check_correctness) {
         printf("check union correctness.\n");
+        if (check_flahash) check_path = 0;
         HybridHopHL_checker_query_file(L_hybrid, instance_graph, iteration_source_times, iteration_terminal_times, hop_cst, check_path);
     }
 

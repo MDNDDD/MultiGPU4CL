@@ -543,12 +543,12 @@
 //     cudaDeviceSynchronize();
 //     CHECK_CUDA_KERNEL();
     
-//     int print_tag = 0;
+//     int print_tag = 1;
 //     unsigned long long zero = 0;
 //     for (int hop = 1; hop <= hop_cst; hop ++) { // generate the label with (hop = hop)
 //         if (last_size[0] == 0) break;
 
-//         // printf("hop: %d\n", hop);
+//         printf("hop: %d\n", hop);
 //         // step1 À©Õ¹
 //         BLOCKS_NUM = CALC_BLOCKS_NUM_NOLIMIT(THREADS_NUM, last_size[0]);
 //         cudaMemcpy(T_pre_offset, last_size, sizeof(unsigned long long), cudaMemcpyHostToDevice);
@@ -571,25 +571,25 @@
 //         last_pos += last_size[0];
 //         cudaMemcpy(last_size, T_after_offset, sizeof(unsigned long long), cudaMemcpyDeviceToHost);
         
-//         // printf("size: %llu, %llu\n", last_pos, last_size[0]);
+//         printf("size: %llu, %llu\n", last_pos, last_size[0]);
         
 //         if (last_size[0] == 0) break;
 //         BLOCKS_NUM = CALC_BLOCKS_NUM_NOLIMIT(THREADS_NUM, last_size[0]);
 //         clearKernel_das <<<BLOCKS_NUM, THREADS_NUM>>> (D, T + last_pos, source, last_size[0]);
 //         cudaDeviceSynchronize();
 //         CHECK_CUDA_KERNEL();
-//         // printf("clear done.\n");
+//         printf("clear done.\n");
 
-//         // long long *output;
-//         // if (print_tag) {
-//         //     output = (long long *)malloc(1000);
-//         //     cudaMemcpy(output, T + last_pos, last_size[0] * sizeof(long long), cudaMemcpyDeviceToHost);
-//         //     cudaDeviceSynchronize();
-//         //     for (long long i = 0; i < last_size[0]; i++) {
-//         //         printf("gen1 output, to, par, hub, h, dis: %d, %d, %d, %d, %d\n", input_graph.ARRAY_source[get_to_vertex(output[i])], input_graph.OUTs_Edges[get_to_vertex(output[i])],\
-//         //                                                                     get_hub_vertex(output[i]), get_hop(output[i]), get_distance(output[i]));
-//         //     }
-//         // }
+//         long long *output;
+//         if (print_tag) {
+//             output = (long long *)malloc(1000);
+//             cudaMemcpy(output, T + last_pos, last_size[0] * sizeof(long long), cudaMemcpyDeviceToHost);
+//             cudaDeviceSynchronize();
+//             for (long long i = 0; i < last_size[0]; i++) {
+//                 printf("gen1 output, to, par, hub, h, dis: %d, %d, %d, %d, %d\n", input_graph.ARRAY_source[get_to_vertex(output[i])], input_graph.OUTs_Edges[get_to_vertex(output[i])],\
+//                                                                             get_hub_vertex(output[i]), get_hop(output[i]), get_distance(output[i]));
+//             }
+//         }
 
 //         // step2 sort
 //         auto t1 = std::chrono::high_resolution_clock::now();
@@ -599,24 +599,24 @@
 //         auto t2 = std::chrono::high_resolution_clock::now();
 //         double ms = std::chrono::duration<double, std::milli>(t2 - t1).count();
 //         sort_time_record += ms / 1000.0;
-//         // printf("sort done.\n");
+//         printf("sort done.\n");
 
-//         // if (print_tag) {
-//         //     output = (long long *)malloc(1000);
-//         //     cudaMemcpy(output, T + last_pos, last_size[0] * sizeof(long long), cudaMemcpyDeviceToHost);
-//         //     cudaDeviceSynchronize();
-//         //     for (long long i = 0; i < last_size[0]; i++) {
-//         //         printf("gen2 output, to, par, hub, h, dis: %d, %d, %d, %d, %d\n", input_graph.ARRAY_source[get_to_vertex(output[i])], input_graph.OUTs_Edges[get_to_vertex(output[i])],\
-//         //                                                                     get_hub_vertex(output[i]), get_hop(output[i]), get_distance(output[i]));
-//         //     }
-//         // }
+//         if (print_tag) {
+//             output = (long long *)malloc(1000);
+//             cudaMemcpy(output, T + last_pos, last_size[0] * sizeof(long long), cudaMemcpyDeviceToHost);
+//             cudaDeviceSynchronize();
+//             for (long long i = 0; i < last_size[0]; i++) {
+//                 printf("gen2 output, to, par, hub, h, dis: %d, %d, %d, %d, %d\n", input_graph.ARRAY_source[get_to_vertex(output[i])], input_graph.OUTs_Edges[get_to_vertex(output[i])],\
+//                                                                             get_hub_vertex(output[i]), get_hop(output[i]), get_distance(output[i]));
+//             }
+//         }
 
 //         // step3 tranverse
 //         BLOCKS_NUM = CALC_BLOCKS_NUM_NOLIMIT(THREADS_NUM, last_size[0]);
 //         Tranverse_kernel <<<BLOCKS_NUM, THREADS_NUM>>> (T + last_pos, T, H, T_offset_begin, T_offset_end, source, flag, T_after_offset, V);
 //         cudaDeviceSynchronize();
 //         CHECK_CUDA_KERNEL();
-//         // printf("tranverse done.\n");
+//         printf("tranverse done.\n");
         
 //         // step4 gather
 //         Gather_kernel(T + last_pos, flag, last_size[0], D_sort_temp, d_num_selected);
@@ -624,21 +624,21 @@
 //         cudaDeviceSynchronize();
 //         CHECK_CUDA_KERNEL();
 
-//         // if (print_tag) {
-//         //     cudaMemcpy(output, T + last_pos, last_size[0] * sizeof(long long), cudaMemcpyDeviceToHost);
-//         //     cudaDeviceSynchronize();
-//         //     for (long long i = 0; i < last_size[0]; i++) {
-//         //         printf("gen3 output, to, par, hub, h, dis: %d, %d, %d, %d, %d\n", input_graph.ARRAY_source[get_to_vertex(output[i])], input_graph.OUTs_Edges[get_to_vertex(output[i])],\
-//         //                                                                     get_hub_vertex(output[i]), get_hop(output[i]), get_distance(output[i]));
-//         //     }
-//         // }
+//         if (print_tag) {
+//             cudaMemcpy(output, T + last_pos, last_size[0] * sizeof(long long), cudaMemcpyDeviceToHost);
+//             cudaDeviceSynchronize();
+//             for (long long i = 0; i < last_size[0]; i++) {
+//                 printf("gen3 output, to, par, hub, h, dis: %d, %d, %d, %d, %d\n", input_graph.ARRAY_source[get_to_vertex(output[i])], input_graph.OUTs_Edges[get_to_vertex(output[i])],\
+//                                                                             get_hub_vertex(output[i]), get_hop(output[i]), get_distance(output[i]));
+//             }
+//         }
 
 //         // step5 update hash
 //         // if (hop < hop_cst) updateHas<<<BLOCKS_NUM, THREADS_NUM>>>(T + last_pos, last_pos, H, last_size[0], T_offset_begin, T_offset_end, V, hop, hop_cst);
 //         updateHas<<<BLOCKS_NUM, THREADS_NUM>>>(T + last_pos, last_pos, H, last_size[0], T_offset_begin, T_offset_end, source, V, hop, hop_cst);
 //         cudaDeviceSynchronize();
 //         CHECK_CUDA_KERNEL();
-//         // printf("updateHas done.\n");
+//         printf("updateHas done.\n");
 //     }
 //     last_pos += last_size[0] - 1;
 //     BLOCKS_NUM = CALC_BLOCKS_NUM_NOLIMIT(THREADS_NUM, last_pos);
