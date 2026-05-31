@@ -1,5 +1,7 @@
 FROM nvidia/cuda:11.8.0-cudnn8-devel-ubuntu22.04
 
+ARG GPU_ARCH=86
+
 ENV DEBIAN_FRONTEND=noninteractive
 
 RUN apt-get update && apt-get install -y \
@@ -12,11 +14,17 @@ RUN apt-get update && apt-get install -y \
 
 WORKDIR /workspace/MultiGPU4CL
 
-COPY . .
+COPY CMakeLists.txt .
+COPY src/ src/
+COPY include/ include/
 
-RUN sed -i 's|include_directories("/home/mdnd/boost_1_85_0")|include_directories("/usr/include")|g' CMakeLists.txt
+RUN rm -rf build && mkdir build && cd build && \
+    cmake -DGPU_ARCH=${GPU_ARCH} .. && \
+    make -j$(nproc)
 
-RUN rm -rf build && mkdir build && cd build && cmake .. && make -j$(nproc)
+COPY data/ data/
+
+RUN mkdir -p output
 
 WORKDIR /workspace/MultiGPU4CL/build/bin
 
