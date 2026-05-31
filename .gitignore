@@ -10,4 +10,5 @@ test.sh
 run_10w.sh
 run_exp.sh
 run_100w.sh
-switch-cuda.sh
+switch-cuda.shdata/DBLP.e
+data/as-skitter.e
