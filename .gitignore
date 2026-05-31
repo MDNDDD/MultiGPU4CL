@@ -5,10 +5,13 @@
 build/
 .vscode/
 exp_record/
+.trae/
 
 test.sh
 run_10w.sh
 run_exp.sh
 run_100w.sh
-switch-cuda.shdata/DBLP.e
+switch-cuda.sh
+data/DBLP.e
 data/as-skitter.e
+data/as-skitter copy.e
