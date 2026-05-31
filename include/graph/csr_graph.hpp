@@ -5,9 +5,10 @@
 #include <cuda_runtime.h>
 #include <cuda_runtime_api.h>
 #include <vector>
-#include <graph/ldbc.hpp>
-#include <graph_v_of_v/graph_v_of_v.h>
-#include <definition/pair_hash.hpp>
+#include <graph/ldbc_graph.hpp>
+#include <graph/graph_v_of_v.hpp>
+#include <utils/pair_hash.hpp>
+#include <core/cuda_error.cuh>
 
 /* for GPU */
 template <typename weight_type>
@@ -180,10 +181,7 @@ CSR_graph<weight_type> graph_v_of_v_to_CSR(graph_v_of_v<weight_type> &g) {
     cudaMallocManaged((void **)&ARRAY.out_edge_weight, E_out * sizeof(int));
 
     cudaDeviceSynchronize();
-    cudaError_t error = cudaGetLastError();
-    if (error != cudaSuccess) {
-        printf("CUDA error: %s\n", cudaGetErrorString(error));
-    }
+    CHECK_CUDA_KERNEL();
 
     cudaMemcpy(ARRAY.in_pointer, ARRAY.INs_Neighbor_start_pointers.data(), (V + 1) * sizeof(int), cudaMemcpyHostToDevice);
     cudaMemcpy(ARRAY.out_pointer, ARRAY.OUTs_Neighbor_start_pointers.data(), (V + 1) * sizeof(int), cudaMemcpyHostToDevice);
